@@ -1,0 +1,283 @@
+# =============================================================================
+# SECURE MY SITE - GITIGNORE
+# Python Desktop Application with PyQt6
+# =============================================================================
+
+# =============================================================================
+# PYTHON
+# =============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+!build.spec  # Keep the PyInstaller spec file in version control
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pytestdebug.log
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Cython debug symbols
+cython_debug/
+
+# =============================================================================
+# PYQT6 / QT SPECIFIC
+# =============================================================================
+
+# Qt Creator
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.moc
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+Makefile*
+*build-*
+*.qm
+
+# Qt Resource Collection
+*.qrc.depends
+
+# Compiled UI files (if generated)
+*_ui.py
+*_rc.py
+
+# =============================================================================
+# IDE / EDITORS
+# =============================================================================
+
+# PyCharm / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VS Code
+.vscode/
+*.code-workspace
+.history/
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*~
+.vim/
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Eclipse
+.project
+.pydevproject
+.settings/
+
+# =============================================================================
+# OPERATING SYSTEMS
+# =============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# APPLICATION SPECIFIC - SECURE MY SITE
+# =============================================================================
+
+# Build outputs (PyInstaller)
+/dist/SecureMySite/
+/dist/SecureMySite.exe
+/dist/SecureMySite.app
+/build/pyinstaller/
+/output/
+
+# Local test projects (for development testing)
+/test_projects/
+/samples/vulnerable/
+/samples/output/
+
+# Generated reports (user data)
+*.security-report.json
+*.security-report.html
+/security-reports/
+
+# Local vulnerability database updates (auto-downloaded)
+/assets/vuln_db.local.json
+/assets/vuln_db.backup.json
+
+# User configuration (local settings)
+config.json
+user_preferences.json
+.scan_history
+
+# Log files
+/logs/
+*.log
+secure_my_site.log
+
+# Temporary scan data
+/tmp/
+/temp/
+*.tmp
+.scan_cache/
+
+# =============================================================================
+# SECURITY / SENSITIVE
+# =============================================================================
+
+# Never commit actual secrets (even for testing)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets.json
+credentials.json
+.env.*
+!.env.example
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# =============================================================================
+# DOCUMENTATION BUILD
+# =============================================================================
+
+/docs/_build/
+/site/
+
+# =============================================================================
+# MISC
+# =============================================================================
+
+# Node modules (if using any JS tooling)
+node_modules/
+
+# Local development scripts
+dev_*.py
+scratch_*.py
+test_*.py
+!test_*.py  # Uncomment if you want to exclude all test files
+
+# Profiling data
+*.prof
+*.lprof
+profile_stats/
+
+# =============================================================================
+# EXCEPTIONS - KEEP THESE FILES
+# =============================================================================
+
+# !assets/vuln_db.json           # Keep base vulnerability database
+# !tests/test_data/              # Keep test fixtures
