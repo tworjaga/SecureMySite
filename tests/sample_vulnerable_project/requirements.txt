@@ -1,0 +1,9 @@
+# Vulnerable dependencies for testing
+django==3.0.0
+flask==0.12.2
+requests==2.19.0
+urllib3==1.23
+pyyaml==3.13
+pillow==5.1.0
+numpy==1.15.0
+cryptography==2.0.0
