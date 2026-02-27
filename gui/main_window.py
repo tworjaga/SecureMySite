@@ -9,15 +9,15 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QLineEdit, QFileDialog, QMessageBox, QSplitter,
     QTextEdit, QGroupBox, QGridLayout, QStatusBar, QMenuBar,
-    QMenu, QApplication, QProgressDialog
+    QMenu, QApplication
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSettings
-from PyQt6.QtGui import QAction, QKeySequence, QClipboard
+from PyQt6.QtGui import QAction, QKeySequence
 
 from core.engine import AnalysisEngine
 from core.config import Config
 from models.scan_result import ScanResult
-from models.vulnerability import Vulnerability
+from models.vulnerability import Vulnerability, Severity
 from prompt_engine.prompt_builder import PromptBuilder
 from gui.theme import Theme
 from gui.components import (
@@ -379,4 +379,162 @@ class MainWindow(QMainWindow):
         if result.metadata and 'score' in result.metadata:
             score_data = result.metadata['score']
             self.score_display.set_score(
-                score_data.get('score', 0),\n                score_data.get('risk_level', 'Unknown'),\n                score_data.get('grade', '-')\n            )\n        \n        # Update severity counts\n        self.critical_badge.set_count(result.get_critical_count())\n        self.high_badge.set_count(result.get_high_count())\n        self.medium_badge.set_count(result.get_medium_count())\n        self.low_badge.set_count(result.get_low_count())\n        \n        # Update vulnerability list\n        self.vuln_list.set_vulnerabilities(result.vulnerabilities)\n        \n        # Enable action buttons\n        has_results = len(result.vulnerabilities) > 0\n        self.prompt_btn.setEnabled(has_results)\n        self.copy_btn.setEnabled(has_results)\n        \n        # Update status\n        summary = result.get_summary()\n        self.statusbar.showMessage(\n            f"Scan complete: {summary['total_vulnerabilities']} issues found in {summary['files_scanned']} files\"\n        )\n    \n    def _on_scan_error(self, error: str):\n        """Handle scan error.\"\"\"\n        self.scan_btn.setEnabled(True)\n        self.progress.hide_progress()\n        self.statusbar.showMessage(\"Scan failed\")\n        \n        QMessageBox.critical(self, \"Scan Error\", f\"Scan failed:\\n{error}\")\n    \n    def _on_vulnerability_selected(self, vulnerability: Vulnerability):\n        \"\"\"Display vulnerability details.\"\"\"\n        self.details_title.setText(f\"[{vulnerability.severity.name}] {vulnerability.title}\")\n        self.details_location.setText(vulnerability.get_location_string())\n        self.details_desc.setText(vulnerability.description)\n        self.details_remediation.setText(f\"Fix: {vulnerability.remediation}\")\n        \n        if vulnerability.code_snippet:\n            self.code_preview.set_code(vulnerability.code_snippet)\n        else:\n            self.code_preview.clear_code()\n    \n    def _generate_prompt(self):\n        \"\"\"Generate AI fix prompt.\"\"\"\n        if not self.current_result:\n            return\n        \n        builder = PromptBuilder(self.current_result)\n        prompt = builder.build_prompt()\n        \n        # Show in dialog\n        dialog = QTextEdit()\n        dialog.setPlainText(prompt)\n        dialog.setReadOnly(True)\n        dialog.setWindowTitle(\"AI Fix Prompt\")\n        dialog.resize(800, 600)\n        dialog.show()\n        \n        # Also copy to clipboard\n        clipboard = QApplication.clipboard()\n        clipboard.setText(prompt)\n        \n        self.statusbar.showMessage(\"Prompt generated and copied to clipboard\", 3000)\n    \n    def _copy_results(self):\n        \"\"\"Copy results summary to clipboard.\"\"\"\n        if not self.current_result:\n            return\n        \n        summary = self.current_result.get_summary()\n        text = f\"\"\"Security Scan Results\n\nScore: {self.current_result.metadata.get('score', {}).get('score', 'N/A')}/100\nRisk Level: {self.current_result.metadata.get('score', {}).get('risk_level', 'Unknown')}\n\nVulnerabilities:\n- Critical: {summary['critical']}\n- High: {summary['high']}\n- Medium: {summary['medium']}\n- Low: {summary['low']}\n\nFiles Scanned: {summary['files_scanned']}\nDuration: {summary['duration_seconds']:.1f}s\n\"\"\"\n        \n        clipboard = QApplication.clipboard()\n        clipboard.setText(text)\n        \n        self.statusbar.showMessage(\"Results copied to clipboard\", 3000)\n    \n    def _export_results(self, format_type: str):\n        \"\"\"Export results to file.\"\"\"\n        if not self.current_result:\n            QMessageBox.warning(self, \"Error\", \"No scan results to export\")\n            return\n        \n        # Get save path\n        extensions = {\n            \"json\": \"JSON (*.json)\",\n            \"html\": \"HTML (*.html)\",\n            \"markdown\": \"Markdown (*.md)\"\n        }\n        \n        path, _ = QFileDialog.getSaveFileName(\n            self,\n            f\"Export {format_type.upper()}\",\n            f\"security_report.{format_type if format_type != 'markdown' else 'md'}\",\n            extensions.get(format_type, \"All Files (*)\")\n        )\n        \n        if not path:\n            return\n        \n        try:\n            if self.scan_worker and self.scan_worker.engine:\n                content = self.scan_worker.engine.export_results(format_type)\n                with open(path, 'w', encoding='utf-8') as f:\n                    f.write(content)\n                \n                self.statusbar.showMessage(f\"Exported to {path}\", 3000)\n            else:\n                QMessageBox.warning(self, \"Error\", \"Scan engine not available\")\n        except Exception as e:\n            QMessageBox.critical(self, \"Export Error\", str(e))\n    \n    def _show_about(self):\n        \"\"\"Show about dialog.\"\"\"\n        QMessageBox.about(\n            self,\n            \"About Secure My Site\",\n            \"\"\"<h2>Secure My Site</h2>\n            <p>Version 1.0.0</p>\n            <p>A local security analyzer for AI-generated web projects.</p>\n            <p>Features:</p>\n            <ul>\n                <li>Static Application Security Testing (SAST)</li>\n                <li>Dependency vulnerability scanning</li>\n                <li>Configuration security analysis</li>\n                <li>Localhost web security scanning</li>\n                <li>AI-powered fix generation</li>\n            </ul>\n            <p>100% offline - no data leaves your machine.</p>\n            \"\"\"\n        )\n    \n    def closeEvent(self, event):\n        \"\"\"Handle window close.\"\"\"\n        self._save_settings()\n        \n        # Stop any running scan\n        if self.scan_worker and self.scan_worker.isRunning():\n            self.scan_worker.terminate()\n            self.scan_worker.wait(1000)\n        \n        event.accept()\n
+                score_data.get('score', 0),
+                score_data.get('risk_level', 'Unknown'),
+                score_data.get('grade', '-')
+            )
+        
+        # Update severity counts
+        self.critical_badge.set_count(result.get_critical_count())
+        self.high_badge.set_count(result.get_high_count())
+        self.medium_badge.set_count(result.get_medium_count())
+        self.low_badge.set_count(result.get_low_count())
+        
+        # Update vulnerability list
+        self.vuln_list.set_vulnerabilities(result.vulnerabilities)
+        
+        # Enable action buttons
+        has_results = len(result.vulnerabilities) > 0
+        self.prompt_btn.setEnabled(has_results)
+        self.copy_btn.setEnabled(has_results)
+        
+        # Update status
+        summary = result.get_summary()
+        self.statusbar.showMessage(
+            f"Scan complete: {summary['total_vulnerabilities']} issues found in {summary['files_scanned']} files"
+        )
+    
+    def _on_scan_error(self, error: str):
+        """Handle scan error."""
+        self.scan_btn.setEnabled(True)
+        self.progress.hide_progress()
+        self.statusbar.showMessage("Scan failed")
+        
+        QMessageBox.critical(self, "Scan Error", f"Scan failed:\n{error}")
+    
+    def _on_vulnerability_selected(self, vulnerability: Vulnerability):
+        """Display vulnerability details."""
+        self.details_title.setText(f"[{vulnerability.severity.name}] {vulnerability.title}")
+        self.details_location.setText(vulnerability.get_location_string())
+        self.details_desc.setText(vulnerability.description)
+        self.details_remediation.setText(f"Fix: {vulnerability.remediation}")
+        
+        if vulnerability.code_snippet:
+            self.code_preview.set_code(vulnerability.code_snippet)
+        else:
+            self.code_preview.clear_code()
+    
+    def _generate_prompt(self):
+        """Generate AI fix prompt."""
+        if not self.current_result:
+            return
+        
+        builder = PromptBuilder(self.current_result)
+        prompt = builder.build_prompt()
+        
+        # Show in dialog
+        dialog = QTextEdit()
+        dialog.setPlainText(prompt)
+        dialog.setReadOnly(True)
+        dialog.setWindowTitle("AI Fix Prompt")
+        dialog.resize(800, 600)
+        dialog.show()
+        
+        # Also copy to clipboard
+        clipboard = QApplication.clipboard()
+        clipboard.setText(prompt)
+        
+        self.statusbar.showMessage("Prompt generated and copied to clipboard", 3000)
+    
+    def _copy_results(self):
+        """Copy results summary to clipboard."""
+        if not self.current_result:
+            return
+        
+        summary = self.current_result.get_summary()
+        score_data = self.current_result.metadata.get('score', {})
+        text = f"""Security Scan Results
+
+Score: {score_data.get('score', 'N/A')}/100
+Risk Level: {score_data.get('risk_level', 'Unknown')}
+
+Vulnerabilities:
+- Critical: {summary['critical']}
+- High: {summary['high']}
+- Medium: {summary['medium']}
+- Low: {summary['low']}
+
+Files Scanned: {summary['files_scanned']}
+Duration: {summary['duration_seconds']:.1f}s
+"""
+        
+        clipboard = QApplication.clipboard()
+        clipboard.setText(text)
+        
+        self.statusbar.showMessage("Results copied to clipboard", 3000)
+    
+    def _export_results(self, format_type: str):
+        """Export results to file."""
+        if not self.current_result:
+            QMessageBox.warning(self, "Error", "No scan results to export")
+            return
+        
+        # Get save path
+        extensions = {
+            "json": "JSON (*.json)",
+            "html": "HTML (*.html)",
+            "markdown": "Markdown (*.md)"
+        }
+        
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            f"Export {format_type.upper()}",
+            f"security_report.{format_type if format_type != 'markdown' else 'md'}",
+            extensions.get(format_type, "All Files (*)")
+        )
+        
+        if not path:
+            return
+        
+        try:
+            if self.scan_worker and self.scan_worker.engine:
+                content = self.scan_worker.engine.export_results(format_type)
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                
+                self.statusbar.showMessage(f"Exported to {path}", 3000)
+            else:
+                QMessageBox.warning(self, "Error", "Scan engine not available")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", str(e))
+    
+    def _show_about(self):
+        """Show about dialog."""
+        QMessageBox.about(
+            self,
+            "About Secure My Site",
+            """<h2>Secure My Site</h2>
+            <p>Version 1.0.0</p>
+            <p>A local security analyzer for AI-generated web projects.</p>
+            <p>Features:</p>
+            <ul>
+                <li>Static Application Security Testing (SAST)</li>
+                <li>Dependency vulnerability scanning</li>
+                <li>Configuration security analysis</li>
+                <li>Localhost web security scanning</li>
+                <li>AI-powered fix generation</li>
+            </ul>
+            <p>100% offline - no data leaves your machine.</p>
+            """
+        )
+    
+    def closeEvent(self, event):
+        """Handle window close."""
+        self._save_settings()
+        
+        # Stop any running scan
+        if self.scan_worker and self.scan_worker.isRunning():
+            self.scan_worker.terminate()
+            self.scan_worker.wait(1000)
+        
+        event.accept()

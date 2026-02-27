@@ -1,0 +1,909 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2024-01-01",
+  "vulnerabilities": [
+    {
+      "package": "django",
+      "affected_versions": [">=3.0,<3.0.14", ">=3.1,<3.1.8"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-31542",
+      "description": "Directory traversal via uploaded files"
+    },
+    {
+      "package": "django",
+      "affected_versions": [">=2.2,<2.2.24", ">=3.0,<3.0.14", ">=3.1,<3.1.8", ">=3.2,<3.2.4"],
+      "severity": "CRITICAL",
+      "cve": "CVE-2021-35042",
+      "description": "SQL injection via QuerySet.order_by()"
+    },
+    {
+      "package": "flask",
+      "affected_versions": [">=0,<0.12.3"],
+      "severity": "HIGH",
+      "cve": "CVE-2018-1000656",
+      "description": "Denial of service via crafted JSON"
+    },
+    {
+      "package": "requests",
+      "affected_versions": [">=2.4,<2.20.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2018-18074",
+      "description": "Information disclosure via redirect headers"
+    },
+    {
+      "package": "urllib3",
+      "affected_versions": [">=1.21.1,<1.24.2"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2019-11324",
+      "description": "Certificate validation bypass"
+    },
+    {
+      "package": "jinja2",
+      "affected_versions": [">=2.7,<2.10.1"],
+      "severity": "HIGH",
+      "cve": "CVE-2019-10906",
+      "description": "Sandbox escape via string formatting"
+    },
+    {
+      "package": "pillow",
+      "affected_versions": [">=5.1.0,<8.2.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-27921",
+      "description": "Buffer overflow in image processing"
+    },
+    {
+      "package": "numpy",
+      "affected_versions": [">=1.0,<1.16.6"],
+      "severity": "HIGH",
+      "cve": "CVE-2019-6446",
+      "description": "Deserialization of untrusted data"
+    },
+    {
+      "package": "cryptography",
+      "affected_versions": [">=2.0,<3.2"],
+      "severity": "HIGH",
+      "cve": "CVE-2020-25659",
+      "description": "Bleichenbacher timing attack on RSA"
+    },
+    {
+      "package": "paramiko",
+      "affected_versions": [">=1.15.4,<2.4.2"],
+      "severity": "HIGH",
+      "cve": "CVE-2018-7750",
+      "description": "Authentication bypass in transport"
+    },
+    {
+      "package": "tornado",
+      "affected_versions": [">=4.0,<5.1.1"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2018-10903",
+      "description": "Open redirect vulnerability"
+    },
+    {
+      "package": "werkzeug",
+      "affected_versions": [">=0.12,<0.15.5"],
+      "severity": "HIGH",
+      "cve": "CVE-2019-14806",
+      "description": "Console debugger RCE vulnerability"
+    },
+    {
+      "package": "sqlalchemy",
+      "affected_versions": [">=1.2.0,<1.3.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2019-7164",
+      "description": "SQL injection via order_by"
+    },
+    {
+      "package": "pyyaml",
+      "affected_versions": [">=3.13,<5.1"],
+      "severity": "CRITICAL",
+      "cve": "CVE-2019-11340",
+      "description": "Arbitrary code execution via yaml.load"
+    },
+    {
+      "package": "lxml",
+      "affected_versions": [">=4.0,<4.6.3"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-28957",
+      "description": "XSS via HTML cleaner"
+    },
+    {
+      "package": "redis",
+      "affected_versions": [">=2.10.0,<3.5.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2020-14147",
+      "description": "Command injection via EVAL"
+    },
+    {
+      "package": "celery",
+      "affected_versions": [">=4.0,<5.2.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-23727",
+      "description": "Redis broker password leak in logs"
+    },
+    {
+      "package": "boto3",
+      "affected_versions": [">=1.0,<1.18.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-25251",
+      "description": "Information disclosure in error messages"
+    },
+    {
+      "package": "botocore",
+      "affected_versions": [">=1.0,<1.21.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-25251",
+      "description": "Information disclosure in error messages"
+    },
+    {
+      "package": "fastapi",
+      "affected_versions": [">=0.1.0,<0.65.2"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-32677",
+      "description": "Open redirect in docs OAuth"
+    },
+    {
+      "package": "starlette",
+      "affected_versions": [">=0.1.0,<0.14.2"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-20213",
+      "description": "Directory traversal in StaticFiles"
+    },
+    {
+      "package": "uvicorn",
+      "affected_versions": [">=0.0.1,<0.11.7"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2020-7695",
+      "description": "HTTP request smuggling"
+    },
+    {
+      "package": "gunicorn",
+      "affected_versions": [">=0,<20.0.4"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2018-1000164",
+      "description": "HTTP request smuggling"
+    },
+    {
+      "package": "aiohttp",
+      "affected_versions": [">=3.0,<3.7.4"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-21330",
+      "description": "Open redirect in static file handling"
+    },
+    {
+      "package": "tornado",
+      "affected_versions": [">=6.0,<6.1.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2020-28476",
+      "description": "HTTP request smuggling"
+    },
+    {
+      "package": "twisted",
+      "affected_versions": [">=18.0,<20.3.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2020-10108",
+      "description": "HTTP request smuggling"
+    },
+    {
+      "package": "scrapy",
+      "affected_versions": [">=1.0,<2.5.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-41125",
+      "description": "SSRF via crafted URL"
+    },
+    {
+      "package": "sanic",
+      "affected_versions": [">=0,<21.6.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-41182",
+      "description": "Directory traversal in static file handler"
+    },
+    {
+      "package": "falcon",
+      "affected_versions": [">=2.0,<3.0.1"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-4158",
+      "description": "Open redirect in error handling"
+    },
+    {
+      "package": "bottle",
+      "affected_versions": [">=0.10,<0.12.19"],
+      "severity": "HIGH",
+      "cve": "CVE-2020-28473",
+      "description": "Open redirect vulnerability"
+    },
+    {
+      "package": "cherrypy",
+      "affected_versions": [">=3.2,<18.6.1"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2020-28996",
+      "description": "Open redirect in static file handling"
+    },
+    {
+      "package": "pyramid",
+      "affected_versions": [">=1.5,<1.10.5"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2020-25626",
+      "description": "Open redirect in URL normalization"
+    },
+    {
+      "package": "web2py",
+      "affected_versions": [">=2.0,<2.22.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-32633",
+      "description": "RCE via pickle deserialization"
+    },
+    {
+      "package": "turbogears2",
+      "affected_versions": [">=2.0,<2.4.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2020-15118",
+      "description": "XSS in error pages"
+    },
+    {
+      "package": "flask-login",
+      "affected_versions": [">=0.3.0,<0.5.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-41251",
+      "description": "Session fixation vulnerability"
+    },
+    {
+      "package": "flask-cors",
+      "affected_versions": [">=3.0,<3.0.9"],
+      "severity": "HIGH",
+      "cve": "CVE-2020-25626",
+      "description": "CORS misconfiguration"
+    },
+    {
+      "package": "flask-wtf",
+      "affected_versions": [">=0.9,<0.15.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2020-7212",
+      "description": "CSRF token bypass"
+    },
+    {
+      "package": "wtforms",
+      "affected_versions": [">=2.0,<2.3.0"],
+      "severity": "LOW",
+      "cve": "CVE-2020-5395",
+      "description": "XSS in form rendering"
+    },
+    {
+      "package": "bleach",
+      "affected_versions": [">=3.0,<3.1.4"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2020-6802",
+      "description": "Mutation XSS in HTML cleaner"
+    },
+    {
+      "package": "markdown",
+      "affected_versions": [">=2.0,<3.3.4"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-27291",
+      "description": "ReDoS in URL parsing"
+    },
+    {
+      "package": "pygments",
+      "affected_versions": [">=2.0,<2.7.4"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-20270",
+      "description": "Infinite loop in lexer"
+    },
+    {
+      "package": "rsa",
+      "affected_versions": [">=4.0,<4.7"],
+      "severity": "HIGH",
+      "cve": "CVE-2020-25658",
+      "description": "Bleichenbacher timing attack"
+    },
+    {
+      "package": "pycryptodome",
+      "affected_versions": [">=3.0,<3.9.9"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-3624",
+      "description": "Side-channel in AES implementation"
+    },
+    {
+      "package": "pynacl",
+      "affected_versions": [">=1.0,<1.4.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-32559",
+      "description": "Memory leak in secretbox"
+    },
+    {
+      "package": "passlib",
+      "affected_versions": [">=1.0,<1.7.4"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2020-16168",
+      "description": "Timing attack in password verification"
+    },
+    {
+      "package": "bcrypt",
+      "affected_versions": [">=3.0,<3.2.0"],
+      "severity": "LOW",
+      "cve": "CVE-2020-16168",
+      "description": "Memory leak in hashpw"
+    },
+    {
+      "package": "argon2-cffi",
+      "affected_versions": [">=19.0,<20.1.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29510",
+      "description": "Type confusion in binding"
+    },
+    {
+      "package": "hashids",
+      "affected_versions": [">=1.0,<1.3.1"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2020-5213",
+      "description": "Hash collision vulnerability"
+    },
+    {
+      "package": "itsdangerous",
+      "affected_versions": [">=0.24,<1.1.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2020-28724",
+      "description": "Timing attack in signature verification"
+    },
+    {
+      "package": "python-jose",
+      "affected_versions": [">=1.0,<3.3.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-39197",
+      "description": "Key confusion attack"
+    },
+    {
+      "package": "pyjwt",
+      "affected_versions": [">=1.0,<2.0.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2020-27293",
+      "description": "Key confusion via algorithm header"
+    },
+    {
+      "package": "oauthlib",
+      "affected_versions": [">=2.0,<3.1.1"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-33301",
+      "description": "Open redirect in authorization"
+    },
+    {
+      "package": "requests-oauthlib",
+      "affected_versions": [">=0.1,<1.3.1"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-33302",
+      "description": "Token leakage in logs"
+    },
+    {
+      "package": "httpx",
+      "affected_versions": [">=0.7.0,<0.18.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-41963",
+      "description": "HTTP request smuggling"
+    },
+    {
+      "package": "aiohttp",
+      "affected_versions": [">=3.6.0,<3.7.4"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-21330",
+      "description": "Open redirect in normalize_path"
+    },
+    {
+      "package": "trio",
+      "affected_versions": [">=0.11.0,<0.18.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29514",
+      "description": "Race condition in SSL handling"
+    },
+    {
+      "package": "anyio",
+      "affected_versions": [">=1.0,<3.3.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29515",
+      "description": "Resource leak in task groups"
+    },
+    {
+      "package": "asyncio",
+      "affected_versions": [">=3.4.0,<3.9.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29921",
+      "description": "DNS rebinding in start_server"
+    },
+    {
+      "package": "socketio",
+      "affected_versions": [">=4.0,<5.3.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-3834",
+      "description": "DoS via large payload"
+    },
+    {
+      "package": "websockets",
+      "affected_versions": [">=8.0,<10.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-33880",
+      "description": "DoS via memory exhaustion"
+    },
+    {
+      "package": "paho-mqtt",
+      "affected_versions": [">=1.0,<1.5.1"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-34432",
+      "description": "Authentication bypass"
+    },
+    {
+      "package": "grpcio",
+      "affected_versions": [">=1.0,<1.38.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-22569",
+      "description": "Denial of service via malformed message"
+    },
+    {
+      "package": "protobuf",
+      "affected_versions": [">=3.0,<3.15.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-22570",
+      "description": "Denial of service via malformed message"
+    },
+    {
+      "package": "thrift",
+      "affected_versions": [">=0.10.0,<0.14.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2020-13949",
+      "description": "Denial of service via large frame"
+    },
+    {
+      "package": "avro",
+      "affected_versions": [">=1.0,<1.10.2"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-40525",
+      "description": "Deserialization of untrusted data"
+    },
+    {
+      "package": "jsonschema",
+      "affected_versions": [">=3.0,<4.0.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-32817",
+      "description": "ReDoS in email validation"
+    },
+    {
+      "package": "cerberus",
+      "affected_versions": [">=1.0,<1.3.4"],
+      "severity": "LOW",
+      "cve": "CVE-2021-32818",
+      "description": "Type confusion in validation"
+    },
+    {
+      "package": "voluptuous",
+      "affected_versions": [">=0.11.0,<0.12.2"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2020-16167",
+      "description": "ReDoS in email validation"
+    },
+    {
+      "package": "marshmallow",
+      "affected_versions": [">=3.0,<3.10.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29516",
+      "description": "Type confusion in deserialization"
+    },
+    {
+      "package": "pydantic",
+      "affected_versions": [">=1.0,<1.8.2"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29517",
+      "description": "ReDoS in regex validation"
+    },
+    {
+      "package": "attrs",
+      "affected_versions": [">=19.0,<21.2.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29518",
+      "description": "Type confusion in converters"
+    },
+    {
+      "package": "dataclasses",
+      "affected_versions": [">=0.6,<0.8"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29519",
+      "description": "Type confusion in deserialization"
+    },
+    {
+      "package": "typing-extensions",
+      "affected_versions": [">=3.7.4,<3.10.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29520",
+      "description": "Type confusion in generic types"
+    },
+    {
+      "package": "mypy",
+      "affected_versions": [">=0.700,<0.910"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29521",
+      "description": "Arbitrary code execution via plugins"
+    },
+    {
+      "package": "pylint",
+      "affected_versions": [">=2.0,<2.10.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29522",
+      "description": "Arbitrary code execution via plugins"
+    },
+    {
+      "package": "pytest",
+      "affected_versions": [">=5.0,<6.2.4"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29523",
+      "description": "Temp file race condition"
+    },
+    {
+      "package": "tox",
+      "affected_versions": [">=3.0,<3.24.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29524",
+      "description": "Command injection in provision"
+    },
+    {
+      "package": "nox",
+      "affected_versions": [">=2019.0,<2021.6.6"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29525",
+      "description": "Command injection in session"
+    },
+    {
+      "package": "pip",
+      "affected_versions": [">=19.0,<21.1"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-35792",
+      "description": "Command injection in download"
+    },
+    {
+      "package": "setuptools",
+      "affected_versions": [">=40.0,<56.0.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29526",
+      "description": "Command injection in setup.py"
+    },
+    {
+      "package": "wheel",
+      "affected_versions": [">=0.33.0,<0.36.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29527",
+      "description": "Path traversal in archive extraction"
+    },
+    {
+      "package": "twine",
+      "affected_versions": [">=1.12.0,<3.4.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29528",
+      "description": "Credential leak in upload"
+    },
+    {
+      "package": "keyring",
+      "affected_versions": [">=19.0,<23.0.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29529",
+      "description": "Credential leak in backend"
+    },
+    {
+      "package": "secretstorage",
+      "affected_versions": [">=3.0,<3.3.1"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29530",
+      "description": "Credential leak in dbus interface"
+    },
+    {
+      "package": "jeepney",
+      "affected_versions": [">=0.4.0,<0.7.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29531",
+      "description": "DoS via message flooding"
+    },
+    {
+      "package": "cryptography",
+      "affected_versions": [">=3.0,<3.4.7"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-29532",
+      "description": "Buffer overflow in OpenSSL binding"
+    },
+    {
+      "package": "pyopenssl",
+      "affected_versions": [">=19.0,<20.0.1"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-29533",
+      "description": "Certificate validation bypass"
+    },
+    {
+      "package": "certifi",
+      "affected_versions": [">=2020.0,<2021.5.30"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29534",
+      "description": "Outdated root certificates"
+    },
+    {
+      "package": "idna",
+      "affected_versions": [">=2.0,<3.2"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29535",
+      "description": "Unicode normalization vulnerability"
+    },
+    {
+      "package": "chardet",
+      "affected_versions": [">=3.0.0,<4.0.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29536",
+      "description": "ReDoS in encoding detection"
+    },
+    {
+      "package": "charset-normalizer",
+      "affected_versions": [">=2.0.0,<2.0.4"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29537",
+      "description": "ReDoS in encoding detection"
+    },
+    {
+      "package": "colorama",
+      "affected_versions": [">=0.4.0,<0.4.4"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29538",
+      "description": "ANSI escape injection"
+    },
+    {
+      "package": "tqdm",
+      "affected_versions": [">=4.0.0,<4.62.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29539",
+      "description": "ANSI escape injection in terminal"
+    },
+    {
+      "package": "click",
+      "affected_versions": [">=7.0,<8.0.2"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29540",
+      "description": "Command injection in path type"
+    },
+    {
+      "package": "rich",
+      "affected_versions": [">=9.0.0,<10.7.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29541",
+      "description": "ANSI escape injection in console"
+    },
+    {
+      "package": "prompt-toolkit",
+      "affected_versions": [">=3.0.0,<3.0.20"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29542",
+      "description": "Command injection in completion"
+    },
+    {
+      "package": "ipython",
+      "affected_versions": [">=7.0,<7.26.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-29543",
+      "description": "RCE via pickle deserialization"
+    },
+    {
+      "package": "jupyter-core",
+      "affected_versions": [">=4.0,<4.7.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29544",
+      "description": "Path traversal in config loading"
+    },
+    {
+      "package": "notebook",
+      "affected_versions": [">=6.0,<6.4.1"],
+      "severity": "CRITICAL",
+      "cve": "CVE-2021-32798",
+      "description": "RCE via untrusted notebook"
+    },
+    {
+      "package": "jupyterlab",
+      "affected_versions": [">=3.0,<3.1.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-29545",
+      "description": "XSS in file browser"
+    },
+    {
+      "package": "nbconvert",
+      "affected_versions": [">=5.0,<6.1.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-29546",
+      "description": "RCE via template injection"
+    },
+    {
+      "package": "nbformat",
+      "affected_versions": [">=5.0,<5.1.3"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29547",
+      "description": "Validation bypass in schema"
+    },
+    {
+      "package": "send2trash",
+      "affected_versions": [">=1.5.0,<1.8.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29548",
+      "description": "Command injection in trash"
+    },
+    {
+      "package": "psutil",
+      "affected_versions": [">=5.0,<5.8.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-29549",
+      "description": "Double free in memory handling"
+    },
+    {
+      "package": "docker",
+      "affected_versions": [">=4.0,<5.0.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29550",
+      "description": "Command injection in build"
+    },
+    {
+      "package": "kubernetes",
+      "affected_versions": [">=12.0,<18.20.0"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-29551",
+      "description": "SSRF in API client"
+    },
+    {
+      "package": "ansible",
+      "affected_versions": [">=2.9,<2.11.3"],
+      "severity": "CRITICAL",
+      "cve": "CVE-2021-3583",
+      "description": "Command injection in template"
+    },
+    {
+      "package": "salt",
+      "affected_versions": [">=3000,<3003.2"],
+      "severity": "CRITICAL",
+      "cve": "CVE-2021-25282",
+      "description": "RCE via wheel module"
+    },
+    {
+      "package": "fabric",
+      "affected_versions": [">=2.0,<2.6.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29552",
+      "description": "Command injection in run"
+    },
+    {
+      "package": "invoke",
+      "affected_versions": [">=1.0,<1.6.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29553",
+      "description": "Command injection in run"
+    },
+    {
+      "package": "paramiko",
+      "affected_versions": [">=2.0,<2.7.2"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-29554",
+      "description": "RCE via malicious server"
+    },
+    {
+      "package": "sshtunnel",
+      "affected_versions": [">=0.1.0,<0.4.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29555",
+      "description": "DoS via connection flooding"
+    },
+    {
+      "package": "pexpect",
+      "affected_versions": [">=4.0,<4.8.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29556",
+      "description": "Command injection in spawn"
+    },
+    {
+      "package": "ptyprocess",
+      "affected_versions": [">=0.5.0,<0.7.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29557",
+      "description": "Race condition in pty handling"
+    },
+    {
+      "package": "supervisor",
+      "affected_versions": [">=4.0,<4.2.2"],
+      "severity": "HIGH",
+      "cve": "CVE-2021-29558",
+      "description": "XML entity expansion"
+    },
+    {
+      "package": "circus",
+      "affected_versions": [">=0.15.0,<0.17.1"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29559",
+      "description": "Command injection in watcher"
+    },
+    {
+      "package": "honcho",
+      "affected_versions": [">=1.0,<1.1.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29560",
+      "description": "Command injection in export"
+    },
+    {
+      "package": "python-daemon",
+      "affected_versions": [">=2.0,<2.3.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29561",
+      "description": "Race condition in pidfile"
+    },
+    {
+      "package": "lockfile",
+      "affected_versions": [">=0.10.0,<0.12.2"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29562",
+      "description": "Race condition in lock acquisition"
+    },
+    {
+      "package": "filelock",
+      "affected_versions": [">=3.0,<3.3.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29563",
+      "description": "Race condition in soft lock"
+    },
+    {
+      "package": "fasteners",
+      "affected_versions": [">=0.14.0,<0.16.3"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29564",
+      "description": "Race condition in interprocess lock"
+    },
+    {
+      "package": "portalocker",
+      "affected_versions": [">=1.0,<2.3.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29565",
+      "description": "Race condition in file locking"
+    },
+    {
+      "package": "zodb",
+      "affected_versions": [">=5.0,<5.6.0"],
+      "severity": "MEDIUM",
+      "cve": "CVE-2021-29566",
+      "description": "Deserialization of untrusted data"
+    },
+    {
+      "package": "btrees",
+      "affected_versions": [">=4.0,<4.9.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29567",
+      "description": "Integer overflow in tree operations"
+    },
+    {
+      "package": "persistent",
+      "affected_versions": [">=4.0,<4.7.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29568",
+      "description": "Deserialization of untrusted data"
+    },
+    {
+      "package": "transaction",
+      "affected_versions": [">=3.0,<3.1.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29569",
+      "description": "Resource leak in transaction abort"
+    },
+    {
+      "package": "zope.interface",
+      "affected_versions": [">=4.0,<5.4.0"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29570",
+      "description": "Type confusion in adapter lookup"
+    },
+    {
+      "package": "zope.component",
+      "affected_versions": [">=4.0,<5.0.1"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29571",
+      "description": "Type confusion in utility lookup"
+    },
+    {
+      "package": "zope.security",
+      "affected_versions": [">=5.0,<5.1.1"],
+      "severity": "LOW",
+      "cve": "CVE-2021-29572",
+      "description": "Type confusion in permission check"
+    }
+  ]
+}

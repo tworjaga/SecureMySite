@@ -1,0 +1,21 @@
+# SecureMySite - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# GUI Framework
+PyQt6>=6.4.0
+
+# HTTP client for web scanning
+requests>=2.28.0
+
+# Version parsing for dependency scanner
+packaging>=21.0
+
+# Optional: For better JSON handling (included in stdlib)
+# No additional packages required
+
+# Development dependencies (install with: pip install -r requirements-dev.txt)
+# pytest>=7.0.0
+# pytest-qt>=4.0.0
+# black>=22.0.0
+# flake8>=4.0.0
+# mypy>=0.950
