@@ -16,8 +16,12 @@ def validate_project_path(path: str) -> Tuple[bool, Optional[str]]:
     Returns:
         Tuple of (is_valid, error_message)
     """
+    if not path or not path.strip():
+        return False, "Path is required"
+    
     try:
         p = Path(path)
+
         
         if not p.exists():
             return False, f"Path does not exist: {path}"
@@ -51,12 +55,16 @@ def validate_url(url: str, allow_localhost_only: bool = True) -> Tuple[bool, Opt
     Returns:
         Tuple of (is_valid, error_message)
     """
+    if not url or not url.strip():
+        return False, "URL is required"
+    
     try:
         parsed = urlparse(url)
         
         # Check scheme
         if not parsed.scheme:
             return False, "URL missing scheme (http:// or https://)"
+
         
         if parsed.scheme not in ('http', 'https'):
             return False, f"Invalid scheme: {parsed.scheme}. Use http:// or https://"
