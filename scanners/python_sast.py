@@ -197,7 +197,35 @@ class PythonSASTScanner(BaseScanner):
             'remediation': 'Address security TODOs before production deployment.',
             'cwe': None
         },
+        'django_csrf_disabled': {
+            'pattern': r'@csrf_exempt|CSRF_COOKIE_SECURE\s*=\s*False',
+            'severity': Severity.HIGH,
+            'category': Category.CONFIGURATION,
+            'title': 'Django CSRF Protection Disabled',
+            'description': 'CSRF protection is disabled, allowing cross-site request forgery attacks',
+            'remediation': 'Remove @csrf_exempt decorator. Set CSRF_COOKIE_SECURE = True in production.',
+            'cwe': 'CWE-352'
+        },
+        'django_secret_key_hardcoded': {
+            'pattern': r'SECRET_KEY\s*=\s*["\'][^"\']+["\']',
+            'severity': Severity.CRITICAL,
+            'category': Category.EXPOSURE,
+            'title': 'Django SECRET_KEY Hardcoded',
+            'description': 'Django SECRET_KEY is hardcoded in settings',
+            'remediation': 'Load SECRET_KEY from environment variable using os.environ.get().',
+            'cwe': 'CWE-798'
+        },
+        'django_allowed_hosts_wildcard': {
+            'pattern': r'ALLOWED_HOSTS\s*=\s*\[\s*["\']?\*["\']?\s*\]',
+            'severity': Severity.HIGH,
+            'category': Category.CONFIGURATION,
+            'title': 'Django ALLOWED_HOSTS Set to Wildcard',
+            'description': 'ALLOWED_HOSTS = ["*"] allows any host header, enabling HTTP Host header attacks',
+            'remediation': 'Specify exact domain names in ALLOWED_HOSTS. Never use wildcard in production.',
+            'cwe': 'CWE-644'
+        },
     }
+
     
     def get_name(self) -> str:
         return "python_sast"
@@ -261,6 +289,11 @@ class PythonSASTScanner(BaseScanner):
                             'match': match.group(0)[:100]
                         }
                     )
+                    # Calculate column positions correctly
+                    line_start_pos = content.rfind('\n', 0, match.start()) + 1
+                    col_start = match.start() - line_start_pos
+                    col_end = match.end() - line_start_pos
+                    
                     vuln = Vulnerability(
                         id=vuln.id,
                         title=vuln.title,
@@ -269,8 +302,8 @@ class PythonSASTScanner(BaseScanner):
                         category=vuln.category,
                         file_path=context.file_path,
                         line_number=vuln.line_number,
-                        column_start=match.start() - content.rfind('\n', 0, match.start()),
-                        column_end=match.end() - content.rfind('\n', 0, match.end()),
+                        column_start=col_start,
+                        column_end=col_end,
                         code_snippet=vuln.code_snippet,
                         remediation=vuln.remediation,
                         cwe_id=vuln.cwe_id,
@@ -278,6 +311,7 @@ class PythonSASTScanner(BaseScanner):
                         metadata=vuln.metadata,
                         timestamp=vuln.timestamp
                     )
+
                     vulnerabilities.append(vuln)
                     
             except re.error as e:
