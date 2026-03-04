@@ -9,10 +9,10 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QLineEdit, QFileDialog, QMessageBox, QSplitter,
     QTextEdit, QGroupBox, QGridLayout, QStatusBar, QMenuBar,
-    QMenu, QApplication
+    QMenu, QApplication, QFrame, QGraphicsDropShadowEffect
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSettings
-from PyQt6.QtGui import QAction, QKeySequence
+from PyQt6.QtGui import QAction, QKeySequence, QColor
 
 from core.engine import AnalysisEngine
 from core.config import Config
@@ -22,7 +22,7 @@ from prompt_engine.prompt_builder import PromptBuilder
 from gui.theme import Theme
 from gui.components import (
     ScoreDisplay, VulnerabilityList, CodePreview,
-    ProgressWidget, ActionButton, SeverityBadge
+    ProgressWidget, SeverityBadge
 )
 from utils.validators import validate_project_path, validate_url
 
@@ -118,109 +118,200 @@ class MainWindow(QMainWindow):
         help_menu.addAction(about_action)
     
     def _setup_ui(self):
-        """Setup main UI."""
+        """Setup modern main UI."""
         central = QWidget()
         self.setCentralWidget(central)
         
         main_layout = QVBoxLayout(central)
-        main_layout.setSpacing(16)
-        main_layout.setContentsMargins(24, 24, 24, 24)
+        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(32, 24, 32, 24)
         
-        # Header
-        header = QLabel("Secure My Site")
-        header.setObjectName("titleLabel")
-        header.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {Theme.PRIMARY};")
-        main_layout.addWidget(header)
+        # Modern header with logo area
+        header_container = self._create_header()
+        main_layout.addWidget(header_container)
         
-        # Input section
+        # Input section (modern card)
         input_group = self._create_input_section()
         main_layout.addWidget(input_group)
         
-        # Score section
-        score_group = self._create_score_section()
-        main_layout.addWidget(score_group)
+        # Score dashboard (modern layout)
+        score_container = self._create_score_dashboard()
+        main_layout.addWidget(score_container)
         
-        # Results splitter
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        
-        # Vulnerability list
-        self.vuln_list = VulnerabilityList()
-        self.vuln_list.vulnerability_selected.connect(self._on_vulnerability_selected)
-        splitter.addWidget(self.vuln_list)
-        
-        # Details panel
-        self.details_panel = self._create_details_panel()
-        splitter.addWidget(self.details_panel)
-        
-        splitter.setSizes([400, 500])
-        main_layout.addWidget(splitter, 1)
+        # Results area with modern splitter
+        results_container = self._create_results_area()
+        main_layout.addWidget(results_container, 1)
         
         # Progress widget
         self.progress = ProgressWidget()
         main_layout.addWidget(self.progress)
         
-        # Status bar
+        # Modern status bar
         self.statusbar = QStatusBar()
         self.setStatusBar(self.statusbar)
         self.statusbar.showMessage("Ready")
     
+    def _create_header(self) -> QFrame:
+        """Create modern header with title and subtitle."""
+        header = QFrame()
+        header.setStyleSheet(f"""
+            QFrame {{
+                background-color: transparent;
+                border: none;
+            }}
+        """)
+        
+        layout = QVBoxLayout(header)
+        layout.setSpacing(4)
+        layout.setContentsMargins(0, 0, 0, 8)
+        
+        # Main title with gradient effect
+        title = QLabel("Secure My Site")
+        title.setObjectName("titleLabel")
+        title.setStyleSheet(f"""
+            QLabel {{
+                font-size: 32px;
+                font-weight: 700;
+                color: {Theme.TEXT_PRIMARY};
+                background: transparent;
+            }}
+        """)
+        
+        # Subtitle
+        subtitle = QLabel("Local Security Analyzer for AI-Generated Projects")
+        subtitle.setStyleSheet(f"""
+            QLabel {{
+                font-size: 14px;
+                color: {Theme.TEXT_SECONDARY};
+                background: transparent;
+            }}
+        """)
+        
+        layout.addWidget(title)
+        layout.addWidget(subtitle)
+        
+        return header
+    
     def _create_input_section(self) -> QGroupBox:
-        """Create project input section."""
+        """Create modern project input section."""
         group = QGroupBox("Project Configuration")
+        group.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: {Theme.SURFACE};
+                border: 1px solid {Theme.BORDER};
+                border-radius: {Theme.BORDER_RADIUS_LARGE};
+                margin-top: 16px;
+                padding-top: 16px;
+                padding: 20px;
+                font-weight: 600;
+                font-size: 16px;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 16px;
+                padding: 0 8px;
+                color: {Theme.TEXT_PRIMARY};
+            }}
+        """)
         
         layout = QGridLayout()
-        layout.setSpacing(12)
+        layout.setSpacing(16)
+        layout.setContentsMargins(8, 8, 8, 8)
         
-        # Project path
-        layout.addWidget(QLabel("Project Path:"), 0, 0)
+        # Project path with modern styling
+        path_label = QLabel("Project Path")
+        path_label.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 13px; font-weight: 500;")
+        layout.addWidget(path_label, 0, 0)
         
         path_layout = QHBoxLayout()
-        self.path_input = QLineEdit()
-        self.path_input.setPlaceholderText("Select project directory...")
-        path_layout.addWidget(self.path_input)
+        path_layout.setSpacing(8)
         
-        browse_btn = QPushButton("Browse...")
+        self.path_input = QLineEdit()
+        self.path_input.setPlaceholderText("/path/to/your/project")
+        self.path_input.setMinimumHeight(36)
+        
+        browse_btn = QPushButton("Browse")
+        browse_btn.setObjectName("secondaryButton")
+        browse_btn.setMinimumHeight(36)
         browse_btn.clicked.connect(self._browse_project)
+        
+        path_layout.addWidget(self.path_input)
         path_layout.addWidget(browse_btn)
         
         layout.addLayout(path_layout, 0, 1)
         
-        # URL input
-        layout.addWidget(QLabel("Local URL:"), 1, 0)
+        # URL input with modern styling
+        url_label = QLabel("Local URL")
+        url_label.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 13px; font-weight: 500;")
+        layout.addWidget(url_label, 1, 0)
         
         url_layout = QHBoxLayout()
+        url_layout.setSpacing(8)
+        
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("http://localhost:8000 (optional)")
-        url_layout.addWidget(self.url_input)
+        self.url_input.setMinimumHeight(36)
         
         validate_btn = QPushButton("Validate")
+        validate_btn.setObjectName("secondaryButton")
+        validate_btn.setMinimumHeight(36)
         validate_btn.clicked.connect(self._validate_url)
+        
+        url_layout.addWidget(self.url_input)
         url_layout.addWidget(validate_btn)
         
         layout.addLayout(url_layout, 1, 1)
         
-        # Scan button
-        self.scan_btn = ActionButton("Start Security Analysis", primary=True)
+        # Modern scan button
+        self.scan_btn = QPushButton("Start Security Analysis")
+        self.scan_btn.setObjectName("primaryButton")
+        self.scan_btn.setMinimumHeight(44)
+        self.scan_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.scan_btn.clicked.connect(self._start_scan)
-        self.scan_btn.setMinimumHeight(40)
+        
         layout.addWidget(self.scan_btn, 2, 0, 1, 2)
         
         group.setLayout(layout)
         return group
     
-    def _create_score_section(self) -> QGroupBox:
-        """Create score display section."""
-        group = QGroupBox("Security Score")
+    def _create_score_dashboard(self) -> QFrame:
+        """Create modern score dashboard."""
+        container = QFrame()
+        container.setStyleSheet(f"""
+            QFrame {{
+                background-color: {Theme.SURFACE};
+                border: 1px solid {Theme.BORDER};
+                border-radius: {Theme.BORDER_RADIUS_LARGE};
+            }}
+        """)
         
-        layout = QHBoxLayout()
+        # Add shadow effect
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 60))
+        shadow.setOffset(0, 4)
+        container.setGraphicsEffect(shadow)
+        
+        layout = QHBoxLayout(container)
         layout.setSpacing(24)
+        layout.setContentsMargins(24, 20, 24, 20)
         
-        # Score display
+        # Animated score display
         self.score_display = ScoreDisplay()
-        layout.addWidget(self.score_display)
+        layout.addWidget(self.score_display, alignment=Qt.AlignmentFlag.AlignCenter)
         
-        # Severity counts
-        counts_layout = QVBoxLayout()
+        # Vertical separator
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.VLine)
+        separator.setStyleSheet(f"color: {Theme.BORDER};")
+        separator.setFixedWidth(1)
+        layout.addWidget(separator)
+        
+        # Severity counts in modern layout
+        counts_container = QFrame()
+        counts_layout = QVBoxLayout(counts_container)
+        counts_layout.setSpacing(8)
+        counts_layout.setContentsMargins(0, 0, 0, 0)
         
         self.critical_badge = SeverityBadge(Severity.CRITICAL, 0)
         self.high_badge = SeverityBadge(Severity.HIGH, 0)
@@ -231,61 +322,160 @@ class MainWindow(QMainWindow):
         counts_layout.addWidget(self.high_badge)
         counts_layout.addWidget(self.medium_badge)
         counts_layout.addWidget(self.low_badge)
-        counts_layout.addStretch()
         
         layout.addLayout(counts_layout)
-        layout.addStretch()
         
-        # Action buttons
-        actions_layout = QVBoxLayout()
+        # Another separator
+        separator2 = QFrame()
+        separator2.setFrameShape(QFrame.Shape.VLine)
+        separator2.setStyleSheet(f"color: {Theme.BORDER};")
+        separator2.setFixedWidth(1)
+        layout.addWidget(separator2)
         
-        self.prompt_btn = QPushButton("Generate Fix Prompt")
+        # Action buttons with modern styling
+        actions_container = QFrame()
+        actions_layout = QVBoxLayout(actions_container)
+        actions_layout.setSpacing(10)
+        actions_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.prompt_btn = QPushButton("Generate AI Fix Prompt")
+        self.prompt_btn.setObjectName("secondaryButton")
+        self.prompt_btn.setMinimumHeight(36)
         self.prompt_btn.clicked.connect(self._generate_prompt)
         self.prompt_btn.setEnabled(False)
-        actions_layout.addWidget(self.prompt_btn)
         
-        self.copy_btn = QPushButton("Copy to Clipboard")
+        self.copy_btn = QPushButton("Copy Results")
+        self.copy_btn.setObjectName("secondaryButton")
+        self.copy_btn.setMinimumHeight(36)
         self.copy_btn.clicked.connect(self._copy_results)
         self.copy_btn.setEnabled(False)
+        
+        actions_layout.addWidget(self.prompt_btn)
         actions_layout.addWidget(self.copy_btn)
-        
         actions_layout.addStretch()
-        layout.addLayout(actions_layout)
         
-        group.setLayout(layout)
-        return group
+        layout.addLayout(actions_layout)
+        layout.addStretch()
+        
+        return container
+    
+    def _create_results_area(self) -> QSplitter:
+        """Create modern results area with splitter."""
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setHandleWidth(2)
+        splitter.setStyleSheet(f"""
+            QSplitter::handle {{
+                background-color: {Theme.BORDER};
+            }}
+        """)
+        
+        # Vulnerability list (modern)
+        self.vuln_list = VulnerabilityList()
+        self.vuln_list.vulnerability_selected.connect(self._on_vulnerability_selected)
+        self.vuln_list.setMinimumWidth(350)
+        splitter.addWidget(self.vuln_list)
+        
+        # Details panel (modern)
+        self.details_panel = self._create_details_panel()
+        self.details_panel.setMinimumWidth(400)
+        splitter.addWidget(self.details_panel)
+        
+        splitter.setSizes([450, 550])
+        
+        return splitter
     
     def _create_details_panel(self) -> QGroupBox:
-        """Create vulnerability details panel."""
+        """Create modern vulnerability details panel."""
         group = QGroupBox("Vulnerability Details")
+        group.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: {Theme.SURFACE};
+                border: 1px solid {Theme.BORDER};
+                border-radius: {Theme.BORDER_RADIUS_LARGE};
+                margin-top: 0px;
+                padding: 20px;
+                font-weight: 600;
+                font-size: 16px;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 0px;
+                padding: 0 0px;
+                color: {Theme.TEXT_PRIMARY};
+            }}
+        """)
         
         layout = QVBoxLayout()
+        layout.setSpacing(16)
+        layout.setContentsMargins(4, 4, 4, 4)
         
+        # Title with severity badge style
         self.details_title = QLabel("Select a vulnerability to view details")
         self.details_title.setWordWrap(True)
-        self.details_title.setStyleSheet(f"font-weight: bold; color: {Theme.TEXT_PRIMARY};")
+        self.details_title.setStyleSheet(f"""
+            QLabel {{
+                font-weight: 600;
+                font-size: 16px;
+                color: {Theme.TEXT_PRIMARY};
+                padding-bottom: 8px;
+                border-bottom: 1px solid {Theme.BORDER};
+            }}
+        """)
         layout.addWidget(self.details_title)
         
+        # Location with icon
         self.details_location = QLabel("")
-        self.details_location.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 11px;")
+        self.details_location.setStyleSheet(f"""
+            QLabel {{
+                color: {Theme.TEXT_TERTIARY};
+                font-size: 12px;
+                font-family: {Theme.FONT_MONO};
+            }}
+        """)
         layout.addWidget(self.details_location)
+        
+        # Description section
+        desc_header = QLabel("Description")
+        desc_header.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 12px; font-weight: 600; text-transform: uppercase;")
+        layout.addWidget(desc_header)
         
         self.details_desc = QLabel("")
         self.details_desc.setWordWrap(True)
-        self.details_desc.setStyleSheet(f"color: {Theme.TEXT_SECONDARY};")
+        self.details_desc.setStyleSheet(f"""
+            QLabel {{
+                color: {Theme.TEXT_SECONDARY};
+                font-size: 13px;
+                line-height: 1.5;
+            }}
+        """)
         layout.addWidget(self.details_desc)
+        
+        # Remediation section
+        fix_header = QLabel("Recommended Fix")
+        fix_header.setStyleSheet(f"color: {Theme.PRIMARY}; font-size: 12px; font-weight: 600; text-transform: uppercase;")
+        layout.addWidget(fix_header)
         
         self.details_remediation = QLabel("")
         self.details_remediation.setWordWrap(True)
-        self.details_remediation.setStyleSheet(f"color: {Theme.PRIMARY};")
+        self.details_remediation.setStyleSheet(f"""
+            QLabel {{
+                color: {Theme.PRIMARY};
+                font-size: 13px;
+                line-height: 1.5;
+            }}
+        """)
         layout.addWidget(self.details_remediation)
         
-        # Code preview
-        layout.addWidget(QLabel("Code:"))
+        # Code preview section
+        code_header = QLabel("Code Snippet")
+        code_header.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 12px; font-weight: 600; text-transform: uppercase;")
+        layout.addWidget(code_header)
+        
         self.code_preview = CodePreview()
-        self.code_preview.setMaximumHeight(200)
+        self.code_preview.setMaximumHeight(250)
         layout.addWidget(self.code_preview)
         
+        layout.addStretch()
         group.setLayout(layout)
         return group
     
