@@ -8,10 +8,11 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QTextEdit, QFrame,
     QSizePolicy, QProgressBar, QGridLayout, QGraphicsDropShadowEffect
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QBrush, QConicalGradient, QRectF
+from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer, QPropertyAnimation, QEasingCurve, QRectF, pyqtProperty
+from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QBrush, QConicalGradient
 
 from models.vulnerability import Vulnerability, Severity
+
 from gui.theme import Theme
 
 
@@ -32,14 +33,15 @@ class AnimatedScoreWidget(QWidget):
         self.setMinimumSize(220, 220)
         self.setMaximumSize(280, 280)
     
-    def animated_score(self):
+    def get_animated_score(self):
         return self._score
     
     def set_animated_score(self, value):
         self._score = value
         self.update()
     
-    animated_score = property(animated_score, set_animated_score)
+    animated_score = pyqtProperty(int, get_animated_score, set_animated_score)
+
     
     def set_score(self, score: int, risk_level: str, grade: str):
         """Animate to new score."""
