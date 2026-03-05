@@ -162,18 +162,20 @@ class MainWindow(QMainWindow):
         """)
         
         layout = QVBoxLayout(header)
-        layout.setSpacing(4)
-        layout.setContentsMargins(0, 0, 0, 8)
+        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 16)
         
         # Main title with gradient effect
         title = QLabel("Secure My Site")
         title.setObjectName("titleLabel")
         title.setStyleSheet(f"""
             QLabel {{
-                font-size: 32px;
+                font-size: 28px;
                 font-weight: 700;
                 color: {Theme.TEXT_PRIMARY};
                 background: transparent;
+                padding: 0;
+                margin: 0;
             }}
         """)
         
@@ -184,6 +186,8 @@ class MainWindow(QMainWindow):
                 font-size: 14px;
                 color: {Theme.TEXT_SECONDARY};
                 background: transparent;
+                padding: 0;
+                margin: 0;
             }}
         """)
         
@@ -191,6 +195,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(subtitle)
         
         return header
+
     
     def _create_input_section(self) -> QGroupBox:
         """Create modern project input section."""
@@ -200,27 +205,28 @@ class MainWindow(QMainWindow):
                 background-color: {Theme.SURFACE};
                 border: 1px solid {Theme.BORDER};
                 border-radius: {Theme.BORDER_RADIUS_LARGE};
-                margin-top: 16px;
-                padding-top: 16px;
-                padding: 20px;
+                margin-top: 12px;
+                padding-top: 8px;
+                padding: 16px;
                 font-weight: 600;
-                font-size: 16px;
+                font-size: 14px;
+                color: {Theme.TEXT_PRIMARY};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 16px;
+                left: 12px;
                 padding: 0 8px;
                 color: {Theme.TEXT_PRIMARY};
             }}
         """)
         
         layout = QGridLayout()
-        layout.setSpacing(16)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(12)
+        layout.setContentsMargins(12, 16, 12, 12)
         
         # Project path with modern styling
         path_label = QLabel("Project Path")
-        path_label.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 13px; font-weight: 500;")
+        path_label.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 13px; font-weight: 500; background: transparent;")
         layout.addWidget(path_label, 0, 0)
         
         path_layout = QHBoxLayout()
@@ -228,7 +234,21 @@ class MainWindow(QMainWindow):
         
         self.path_input = QLineEdit()
         self.path_input.setPlaceholderText("/path/to/your/project")
-        self.path_input.setMinimumHeight(36)
+        self.path_input.setMinimumHeight(40)
+        self.path_input.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {Theme.BACKGROUND};
+                color: {Theme.TEXT_PRIMARY};
+                border: 1px solid {Theme.BORDER};
+                border-radius: {Theme.BORDER_RADIUS_NORMAL};
+                padding: 8px 12px;
+                font-size: 13px;
+            }}
+            QLineEdit:focus {{
+                border-color: {Theme.PRIMARY};
+            }}
+        """)
+
         
         browse_btn = QPushButton("Browse")
         browse_btn.setObjectName("secondaryButton")
@@ -242,7 +262,7 @@ class MainWindow(QMainWindow):
         
         # URL input with modern styling
         url_label = QLabel("Local URL")
-        url_label.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 13px; font-weight: 500;")
+        url_label.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 13px; font-weight: 500; background: transparent;")
         layout.addWidget(url_label, 1, 0)
         
         url_layout = QHBoxLayout()
@@ -250,7 +270,21 @@ class MainWindow(QMainWindow):
         
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("http://localhost:8000 (optional)")
-        self.url_input.setMinimumHeight(36)
+        self.url_input.setMinimumHeight(40)
+        self.url_input.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {Theme.BACKGROUND};
+                color: {Theme.TEXT_PRIMARY};
+                border: 1px solid {Theme.BORDER};
+                border-radius: {Theme.BORDER_RADIUS_NORMAL};
+                padding: 8px 12px;
+                font-size: 13px;
+            }}
+            QLineEdit:focus {{
+                border-color: {Theme.PRIMARY};
+            }}
+        """)
+
         
         validate_btn = QPushButton("Validate")
         validate_btn.setObjectName("secondaryButton")
@@ -267,9 +301,31 @@ class MainWindow(QMainWindow):
         self.scan_btn.setObjectName("primaryButton")
         self.scan_btn.setMinimumHeight(44)
         self.scan_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.scan_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Theme.PRIMARY};
+                color: {Theme.BACKGROUND};
+                border: none;
+                border-radius: {Theme.BORDER_RADIUS_NORMAL};
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.PRIMARY_HOVER};
+            }}
+            QPushButton:pressed {{
+                background-color: {Theme.PRIMARY_DARK};
+            }}
+            QPushButton:disabled {{
+                background-color: {Theme.SURFACE_LIGHT};
+                color: {Theme.TEXT_DISABLED};
+            }}
+        """)
         self.scan_btn.clicked.connect(self._start_scan)
         
         layout.addWidget(self.scan_btn, 2, 0, 1, 2)
+
         
         group.setLayout(layout)
         return group
@@ -393,9 +449,10 @@ class MainWindow(QMainWindow):
                 border: 1px solid {Theme.BORDER};
                 border-radius: {Theme.BORDER_RADIUS_LARGE};
                 margin-top: 0px;
-                padding: 20px;
+                padding: 16px;
                 font-weight: 600;
-                font-size: 16px;
+                font-size: 14px;
+                color: {Theme.TEXT_PRIMARY};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
@@ -406,8 +463,8 @@ class MainWindow(QMainWindow):
         """)
         
         layout = QVBoxLayout()
-        layout.setSpacing(16)
-        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(12)
+        layout.setContentsMargins(8, 8, 8, 8)
         
         # Title with severity badge style
         self.details_title = QLabel("Select a vulnerability to view details")
@@ -415,10 +472,11 @@ class MainWindow(QMainWindow):
         self.details_title.setStyleSheet(f"""
             QLabel {{
                 font-weight: 600;
-                font-size: 16px;
+                font-size: 15px;
                 color: {Theme.TEXT_PRIMARY};
-                padding-bottom: 8px;
+                padding: 8px 0;
                 border-bottom: 1px solid {Theme.BORDER};
+                background: transparent;
             }}
         """)
         layout.addWidget(self.details_title)
@@ -430,13 +488,15 @@ class MainWindow(QMainWindow):
                 color: {Theme.TEXT_TERTIARY};
                 font-size: 12px;
                 font-family: {Theme.FONT_MONO};
+                background: transparent;
+                padding: 4px 0;
             }}
         """)
         layout.addWidget(self.details_location)
         
         # Description section
         desc_header = QLabel("Description")
-        desc_header.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 12px; font-weight: 600; text-transform: uppercase;")
+        desc_header.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 11px; font-weight: 600; text-transform: uppercase; background: transparent; padding: 8px 0 4px 0;")
         layout.addWidget(desc_header)
         
         self.details_desc = QLabel("")
@@ -446,13 +506,15 @@ class MainWindow(QMainWindow):
                 color: {Theme.TEXT_SECONDARY};
                 font-size: 13px;
                 line-height: 1.5;
+                background: transparent;
+                padding: 4px 0;
             }}
         """)
         layout.addWidget(self.details_desc)
         
         # Remediation section
         fix_header = QLabel("Recommended Fix")
-        fix_header.setStyleSheet(f"color: {Theme.PRIMARY}; font-size: 12px; font-weight: 600; text-transform: uppercase;")
+        fix_header.setStyleSheet(f"color: {Theme.PRIMARY}; font-size: 11px; font-weight: 600; text-transform: uppercase; background: transparent; padding: 8px 0 4px 0;")
         layout.addWidget(fix_header)
         
         self.details_remediation = QLabel("")
@@ -462,13 +524,15 @@ class MainWindow(QMainWindow):
                 color: {Theme.PRIMARY};
                 font-size: 13px;
                 line-height: 1.5;
+                background: transparent;
+                padding: 4px 0;
             }}
         """)
         layout.addWidget(self.details_remediation)
         
         # Code preview section
         code_header = QLabel("Code Snippet")
-        code_header.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 12px; font-weight: 600; text-transform: uppercase;")
+        code_header.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 11px; font-weight: 600; text-transform: uppercase; background: transparent; padding: 8px 0 4px 0;")
         layout.addWidget(code_header)
         
         self.code_preview = CodePreview()
@@ -478,6 +542,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         group.setLayout(layout)
         return group
+
     
     def _apply_theme(self):
         """Apply dark theme stylesheet."""
