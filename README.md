@@ -1,5 +1,10 @@
 # Secure My Site
 
+<div align="center">
+  <img src="https://visitor-badge.laobi.icu/badge?page_id=tworjaga.SecureMySite&"  />
+</div>
+
+
 A fully offline, local desktop security analyzer for AI-generated web projects. Detects vulnerabilities before deployment through static analysis (SAST), dynamic analysis (DAST on localhost only), and dependency review.
 
 ## Features
