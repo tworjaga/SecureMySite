@@ -708,7 +708,7 @@ sudo whoami</code></pre>
             <h3 data-i18n="step3">Step 3: SSH Key Authentication</h3>
             <p data-i18n="local_machine">On local machine:</p>
             <pre><code class="command"># Generate SSH key pair (if not exists)
-ssh-keygen -t ed25519 -C "your_email@example.com"
+ssh-keygen -t ed25519 -C "<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="7b02140e09241e161a12173b1e031a160b171e55181416">[email&#160;protected]</a>"
 
 # Copy public key to server
 ssh-copy-id -i ~/.ssh/id_ed25519.pub deploy@server_ip</code></pre>
@@ -1226,13 +1226,923 @@ Proxy status: Proxied (orange cloud)
             </ul>
         </section>
 
+        </section>
+
+        <section id="additional-attacks">
+            <h2 data-i18n="additional_attacks_title">11. Additional Attack Vectors</h2>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_ssrf">Server-Side Request Forgery (SSRF)</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_ssrf_what">Attacker tricks the server into making HTTP requests to internal resources</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_ssrf_how">URL parameters passed to server-side HTTP clients without validation (e.g. <code>fetch(req.body.url)</code>)</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_ssrf_prevent">Whitelist allowed domains, block private IP ranges (10.x, 172.16.x, 192.168.x, 169.254.x), use a dedicated egress proxy</span></p>
+            </div>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_path">Path Traversal</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_path_what">Access to files outside the intended directory by manipulating paths</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_path_how">Input like <code>../../etc/passwd</code> passed to file read functions</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_path_prevent">Resolve and validate paths against allowed base directory, use <code>path.resolve()</code> + startsWith check, never expose raw user input to filesystem calls</span></p>
+            </div>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_clickjacking">Clickjacking</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_clickjacking_what">Attacker overlays invisible iframe to trick users into clicking hidden elements</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_clickjacking_how">Your page embedded in malicious site's iframe</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_clickjacking_prevent">Set <code>X-Frame-Options: DENY</code> and <code>Content-Security-Policy: frame-ancestors 'none'</code></span></p>
+            </div>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_2fa">Missing Multi-Factor Authentication</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_2fa_what">Account takeover via credential stuffing or phishing even with strong passwords</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_2fa_how">Leaked credential databases reused across services (credential stuffing)</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_2fa_prevent">Enforce TOTP/WebAuthn for all admin access; use <code>speakeasy</code> or <code>otplib</code> for TOTP; consider passkeys (FIDO2) for users</span></p>
+            </div>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_secrets">Hardcoded Secrets in Container Images</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_secrets_what">Secrets baked into Docker image layers remain accessible even after deletion</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_secrets_how">COPY .env or RUN commands with credentials in Dockerfile leave traces in image history</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_secrets_prevent">Use <code>--secret</code> BuildKit mounts, inject secrets at runtime via environment variables or secrets managers (HashiCorp Vault, AWS Secrets Manager, Doppler)</span></p>
+            </div>
+        </section>
+
+        <section id="secrets-management">
+            <h2 data-i18n="secrets_title">12. Secrets Management</h2>
+            <p data-i18n="secrets_intro">Never store secrets in code or Docker images. Use a dedicated secrets manager:</p>
+
+            <h3 data-i18n="secrets_tools">Tools</h3>
+            <ul>
+                <li data-i18n="secrets_vault"><strong>HashiCorp Vault:</strong> Self-hosted, dynamic secrets, fine-grained policies. Best for advanced setups.</li>
+                <li data-i18n="secrets_doppler"><strong>Doppler:</strong> SaaS, syncs .env automatically per environment. Easy to start with.</li>
+                <li data-i18n="secrets_aws"><strong>AWS Secrets Manager / Parameter Store:</strong> Native if already on AWS. Supports automatic rotation.</li>
+                <li data-i18n="secrets_infisical"><strong>Infisical:</strong> Open-source alternative to Doppler, self-hostable.</li>
+            </ul>
+
+            <h3 data-i18n="secrets_runtime">Runtime Injection Pattern</h3>
+            <pre><code class="command"># Docker: inject at runtime, never baked in
+docker run -e DATABASE_URL="$DATABASE_URL" -e JWT_SECRET="$JWT_SECRET" myapp:latest
+
+# Or use Docker secrets (Swarm/Compose)
+echo "my_secret_value" | docker secret create db_password -
+
+# .gitignore — always include:
+.env
+.env.local
+.env.production
+*.key
+*.pem</code></pre>
+
+            <h3 data-i18n="secrets_scan">Scan for Leaked Secrets</h3>
+            <pre><code class="command"># Install trufflehog (scans git history)
+pip install trufflehog
+trufflehog git file://. --only-verified
+
+# Or gitleaks
+gitleaks detect --source . -v
+
+# Pre-commit hook with detect-secrets
+pip install detect-secrets
+detect-secrets scan > .secrets.baseline
+# Add as pre-commit hook to prevent future commits</code></pre>
+        </section>
+
+        <section id="csp">
+            <h2 data-i18n="csp_title">13. Content Security Policy (CSP)</h2>
+            <p data-i18n="csp_intro">CSP is one of the most powerful defenses against XSS. Many guides skip it — don't.</p>
+
+            <h3 data-i18n="csp_basics">Basics</h3>
+            <pre><code># Nginx — add to server block
+add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" always;
+
+# Report-only mode (test without breaking things)
+add_header Content-Security-Policy-Report-Only "default-src 'self'; report-uri /csp-report;" always;</code></pre>
+
+            <h3 data-i18n="csp_directives">Key Directives</h3>
+            <table>
+                <tr>
+                    <th data-i18n="csp_directive">Directive</th>
+                    <th data-i18n="csp_purpose">Purpose</th>
+                </tr>
+                <tr><td><code>default-src 'self'</code></td><td data-i18n="csp_d1">Baseline: only load resources from same origin</td></tr>
+                <tr><td><code>script-src</code></td><td data-i18n="csp_d2">Where JavaScript can be loaded from</td></tr>
+                <tr><td><code>frame-ancestors 'none'</code></td><td data-i18n="csp_d3">Prevents your page being embedded (clickjacking)</td></tr>
+                <tr><td><code>upgrade-insecure-requests</code></td><td data-i18n="csp_d4">Forces HTTP resources to be requested as HTTPS</td></tr>
+                <tr><td><code>report-uri /endpoint</code></td><td data-i18n="csp_d5">Browser reports violations here — use in staging</td></tr>
+            </table>
+
+            <p data-i18n="csp_warning"><span class="warning">⚠ Warning:</span> Never use <code>unsafe-inline</code> or <code>unsafe-eval</code> in script-src — this defeats the purpose of CSP entirely. Use nonces instead.</p>
+        </section>
+
         <footer>
             <p data-i18n="footer_title">Hosting & Web Security Guide</p>
             <p>GitHub: <a href="https://github.com/tworjaga" rel="noopener">tworjaga</a> | Telegram: <a href="https://t.me/al7exy" rel="noopener">@al7exy</a></p>
-            <p style="margin-top: 1rem; font-size: 0.9rem;" data-i18n="last_updated">Last updated: 2024</p>
+            <p style="margin-top: 1rem; font-size: 0.9rem;" data-i18n="last_updated">Last updated: 2025 — Sections 11–13 added (SSRF, path traversal, MFA, secrets management, CSP)</p>
         </footer>
     </div>
 
-    <script src="translations_complete.js"></script>
+<script>
+// ============================================================
+//  Full i18n Translation Engine
+// ============================================================
+const translations = {
+  en: {
+    // Header
+    title: "Hosting & Web Security",
+    subtitle: "A structured guide for deploying and securing web applications",
+    author: 'Author: <a href="https://github.com/tworjaga" target="_blank" rel="noopener">tworjaga</a> | Telegram: <a href="https://t.me/al7exy" target="_blank" rel="noopener">@al7exy</a>',
+    disclaimer: "WARNING: Use at your own risk. This guide provides educational content for securing systems. Always test configurations in isolated environments before production deployment. The authors assume no liability for damages or security incidents resulting from the use of this material.",
+    // TOC
+    toc_title: "Table of Contents",
+    toc_1: "1. Project Goal",
+    toc_2: "2. Hosting Fundamentals",
+    toc_3: "3. Beginner Deployment Paths",
+    toc_4: "4. VPS Production Setup",
+    toc_5: "5. Security Practices",
+    toc_6: "6. How You Get Hacked",
+    toc_7: "7. CI/CD & DevOps Basics",
+    toc_8: "8. Production Checklist",
+    toc_9: "9. Learning Paths",
+    toc_10: "10. Common Beginner Mistakes",
+    // Section 1
+    goal_title: "1. Project Goal",
+    goal_intro: "Build a structured, technically correct guide that teaches:",
+    goal_1: "How web hosting works",
+    goal_2: "How to deploy websites (static and dynamic)",
+    goal_3: "How to configure servers securely",
+    goal_4: "How to protect infrastructure from common attacks",
+    goal_5: "How to set up production-ready environments",
+    goal_6: "How to think about security like an engineer",
+    tone_label: "Tone:",
+    tone_desc: "Clear, practical, no fluff, no marketing language. Focus on real-world habits.",
+    // Section 2
+    fundamentals_title: "2. Hosting Fundamentals",
+    what_is_hosting: "What is Hosting",
+    hosting_desc: "Hosting provides the infrastructure (servers, storage, network) to make websites accessible on the internet. A server is a computer that runs continuously, serving content to visitors.",
+    types_hosting: "Types of Hosting",
+    table_type: "Type", table_desc: "Description", table_usecase: "Use Case", table_control: "Control Level",
+    shared_hosting: "Shared Hosting", shared_desc: "Multiple websites on one server", shared_use: "Static sites, blogs", shared_control: "Minimal",
+    vps: "VPS (Virtual Private Server)", vps_desc: "Virtualized server with dedicated resources", vps_use: "Web apps, APIs", vps_control: "Full root access",
+    dedicated: "Dedicated Server", dedicated_desc: "Physical server exclusively yours", dedicated_use: "High-traffic applications", dedicated_control: "Complete",
+    serverless: "Serverless", serverless_desc: "Cloud-managed functions, no server management", serverless_use: "Event-driven apps", serverless_control: "None (managed)",
+    domain_dns: "Domain and DNS",
+    domain_desc: "A domain is a human-readable address (example.com). DNS (Domain Name System) translates domains to IP addresses.",
+    ip_addresses: "IP Addresses",
+    ip_desc: "IPv4: 32-bit address (192.168.1.1). IPv6: 128-bit address (2001:0db8::1). Public IPs are routable on the internet; private IPs are for local networks.",
+    reverse_proxy: "Reverse Proxy",
+    proxy_desc: "A server that sits between clients and backend servers. Handles SSL termination, load balancing, and caching. Common implementations: Nginx, Caddy, Traefik.",
+    ssl_tls: "SSL/TLS",
+    ssl_desc: "Transport Layer Security encrypts data between client and server. TLS 1.3 is current standard. Certificates are issued by Certificate Authorities (Let's Encrypt, free).",
+    // Section 3
+    beginner_title: "3. Beginner Deployment Paths",
+    path1_title: "Path 1: GitHub Pages (Static Sites)",
+    path1_desc: "Free hosting for static websites directly from GitHub repositories.",
+    setup_steps: "Setup Steps",
+    setup_1: "Create repository: username.github.io",
+    setup_2: "Push HTML/CSS/JS files to main branch",
+    setup_3: "Enable Pages in repository settings",
+    folder_structure: "Folder Structure",
+    common_mistakes: "Common Mistakes",
+    mistake_g1: "Repository name must match username exactly",
+    mistake_g2: "Index.html must exist in root or /docs folder",
+    mistake_g3: "Case sensitivity issues on file paths",
+    path2_title: "Path 2: Vercel / Netlify",
+    path2_desc: "Platform-as-a-Service for frontend frameworks and static sites.",
+    vercel_deploy: "Vercel Deployment",
+    netlify_deploy: "Netlify Deployment",
+    troubleshooting: "Troubleshooting",
+    trouble_1: "Build command must output to correct directory (dist/, build/)",
+    trouble_2: "Environment variables set in dashboard, not committed",
+    trouble_3: "Redirects require _redirects file or netlify.toml/vercel.json",
+    path3_title: "Path 3: Basic VPS Deployment",
+    path3_desc: "Deploying to a virtual private server provides full control.",
+    prerequisites: "Prerequisites",
+    prereq_1: "VPS from provider (DigitalOcean, Linode, Hetzner, AWS Lightsail)",
+    prereq_2: "SSH client (OpenSSH on Linux/Mac, PuTTY on Windows)",
+    prereq_3: "Domain name (optional but recommended)",
+    connection: "Connection",
+    // Section 4
+    vps_title: "4. VPS Production Setup Guide",
+    step1: "Step 1: Initial Server Access", step2: "Step 2: Create Non-Root User",
+    step3: "Step 3: SSH Key Authentication", local_machine: "On local machine:",
+    step4: "Step 4: Secure SSH Configuration", step5: "Step 5: Configure Firewall (UFW)",
+    step6: "Step 6: Install Docker", step7: "Step 7: Application Deployment",
+    create_structure: "Create application structure:",
+    step8: "Step 8: Reverse Proxy with Caddy",
+    step9: "Step 9: SSL with Let's Encrypt (Caddy handles automatically)",
+    ssl_auto: "Caddy automatically provisions and renews certificates. For manual certbot with Nginx:",
+    step10: "Step 10: Process Management", systemd_service: "Create systemd service for application:",
+    step11: "Step 11: Backup Strategy",
+    // Section 5
+    security_title: "5. Security Practices",
+    never_do: "Never Do This",
+    never_1: "SSH as root for routine operations", never_2: "Leave password authentication enabled",
+    never_3: "Commit .env files to version control", never_4: "Expose databases publicly (MongoDB, Redis, PostgreSQL)",
+    never_5: "Hardcode API keys in source code", never_6: "Leave unnecessary ports open",
+    never_7: "Run applications as root", never_8: "Disable firewall for debugging",
+    always_do: "Always Do This",
+    always_1: "Use SSH key authentication exclusively", always_2: "Implement strict firewall rules (deny all, allow specific)",
+    always_3: "Deploy Fail2ban for intrusion prevention", always_4: "Enforce HTTPS with valid certificates",
+    always_5: "Apply security updates automatically or regularly", always_6: "Enable comprehensive logging",
+    always_7: "Maintain tested backup procedures", always_8: "Use principle of least privilege",
+    fail2ban_config: "Fail2ban Configuration",
+    auto_updates: "Automatic Updates",
+    // Section 6
+    attacks_title: "6. How You Get Hacked",
+    what_label: "What:", how_label: "How:", prevention_label: "Prevention:",
+    attack_ssh: "SSH Brute Force",
+    attack_ssh_what: "Automated attempts to guess SSH credentials",
+    attack_ssh_how: "Bots scan internet for port 22, try common passwords",
+    attack_ssh_prevent: "Disable password auth, use keys only, move SSH to non-standard port, deploy Fail2ban",
+    attack_db: "Exposed MongoDB/Redis",
+    attack_db_what: "Database accessible without authentication",
+    attack_db_how: "Default configurations bind to 0.0.0.0 without password",
+    attack_db_prevent: "Bind to 127.0.0.1 only, enable auth, firewall block port 27017/6379",
+    attack_sql: "SQL Injection",
+    attack_sql_what: "Malicious SQL commands through user input",
+    attack_sql_how: "Unsanitized input concatenated into queries",
+    attack_sql_prevent: "Use parameterized queries/prepared statements, ORM frameworks, input validation",
+    attack_xss: "Cross-Site Scripting (XSS)",
+    attack_xss_what: "Injection of client-side scripts into web pages",
+    attack_xss_how: "User input displayed without encoding",
+    attack_xss_prevent: "Output encoding, Content Security Policy, HttpOnly cookies",
+    attack_csrf: "Cross-Site Request Forgery (CSRF)",
+    attack_csrf_what: "Unauthorized actions performed on authenticated session",
+    attack_csrf_how: "Malicious site triggers requests to target site",
+    attack_csrf_prevent: "CSRF tokens, SameSite cookies, validate Origin header",
+    attack_supply: "Supply Chain Attacks",
+    attack_supply_what: "Compromise through dependencies",
+    attack_supply_how: "Malicious npm packages, compromised build tools",
+    attack_supply_prevent: "Lock dependencies (package-lock.json), audit with npm audit, private registry",
+    attack_cors: "Misconfigured CORS",
+    attack_cors_what: "Overly permissive cross-origin resource sharing",
+    attack_cors_how: "Access-Control-Allow-Origin: * on sensitive endpoints",
+    attack_cors_prevent: "Whitelist specific origins, validate origin server-side",
+    attack_docker: "Docker Misconfiguration",
+    attack_docker_what: "Container escape or privilege escalation",
+    attack_docker_how: "Running containers as root, mounting Docker socket",
+    attack_docker_prevent: "Run as non-root user, read-only filesystems, drop capabilities",
+    attack_env: ".env Leaks",
+    attack_env_what: "Exposure of environment variables",
+    attack_env_how: "Committed to git, exposed in error messages",
+    attack_env_prevent: ".gitignore .env, validate no secrets in repo with git-secrets, use secret management",
+    attack_s3: "Open S3 Buckets",
+    attack_s3_what: "Publicly accessible cloud storage",
+    attack_s3_how: "Default public permissions, misconfigured bucket policies",
+    attack_s3_prevent: "Block public access settings, IAM policies, regular audits",
+    // Section 7
+    cicd_title: "7. CI/CD & DevOps Basics",
+    github_actions: "GitHub Actions Deployment",
+    create_workflow: "Create .github/workflows/deploy.yml:",
+    secret_mgmt: "Secret Management",
+    secret_1: "Store secrets in GitHub Settings > Secrets and Variables",
+    secret_2: "Never log secrets in CI output",
+    secret_3: "Rotate credentials regularly",
+    secret_4: "Use short-lived tokens where possible",
+    env_vars: "Environment Variables",
+    rate_limiting: "Rate Limiting",
+    rate_limit_desc: "Implement at reverse proxy or application level:",
+    logging: "Logging",
+    monitoring: "Monitoring Concepts",
+    monitor_1: "Prometheus: Metrics collection and alerting",
+    monitor_2: "Grafana: Visualization and dashboards",
+    monitor_3: "Key metrics: CPU, memory, disk, request latency, error rates",
+    monitor_4: "Uptime monitoring: External health checks (UptimeRobot, Pingdom)",
+    cloudflare: "Cloudflare Basics",
+    // Section 8
+    checklist_title: "8. Production Checklist",
+    server_sec: "Server Security",
+    check_1: "Non-root user created and configured", check_2: "SSH root login disabled",
+    check_3: "Password authentication disabled", check_4: "SSH key authentication enforced",
+    check_5: "Firewall enabled (UFW/iptables)", check_6: "Fail2ban installed and active",
+    check_7: "Automatic security updates enabled", check_8: "Unnecessary services disabled",
+    app_sec: "Application Security",
+    check_9: "HTTPS enforced (HSTS enabled)", check_10: "SSL certificate valid and auto-renewing",
+    check_11: "Security headers configured", check_12: "Rate limiting implemented",
+    check_13: "Input validation on all endpoints", check_14: "Authentication and authorization tested",
+    check_15: "Secrets not in code repository", check_16: "Dependencies scanned for vulnerabilities",
+    data_prot: "Data Protection",
+    check_17: "Database not exposed to internet", check_18: "Database authentication enabled",
+    check_19: "Regular backups configured", check_20: "Backup restoration tested",
+    check_21: "Encryption at rest (if applicable)", check_22: "Encryption in transit (TLS 1.2+)",
+    monitor_maint: "Monitoring & Maintenance",
+    check_23: "Logging configured and accessible", check_24: "Log rotation enabled",
+    check_25: "Health checks implemented", check_26: "Monitoring alerts configured",
+    check_27: "Incident response plan documented", check_28: "Documentation current",
+    // Section 9
+    paths_title: "9. Learning Paths",
+    beginner_path: "Beginner Safe Path",
+    path_b1: "Start with GitHub Pages for static sites", path_b2: "Learn DNS basics with custom domain",
+    path_b3: "Progress to Netlify/Vercel with CI/CD", path_b4: "Study Linux fundamentals",
+    path_b5: "Practice with local Docker containers", path_b6: "Deploy first VPS with manual setup",
+    path_b7: "Implement basic security hardening",
+    prod_path: "Production Safe Path",
+    path_p1: "Infrastructure as Code (Terraform/Ansible)", path_p2: "Container orchestration (Docker Compose/Kubernetes)",
+    path_p3: "CI/CD pipeline with automated testing", path_p4: "Centralized logging and monitoring",
+    path_p5: "Automated backup and disaster recovery", path_p6: "Security scanning in pipeline",
+    path_p7: "Blue-green or canary deployments",
+    // Section 10
+    mistakes_title: "10. Common Beginner Mistakes",
+    config_errors: "Configuration Errors",
+    mistake_label: "Mistake:", solution_label: "Solution:",
+    mistake_1: "Editing production configs directly without version control",
+    solution_1: "Use configuration management or at minimum document changes",
+    mistake_2: "Testing in production", solution_2: "Maintain separate staging environment",
+    mistake_3: "Hardcoding configuration values", solution_3: "Environment variables for all environment-specific values",
+    sec_oversights: "Security Oversights",
+    mistake_4: '"Security through obscurity" (hoping attackers won\'t find it)',
+    solution_4: "Assume attacker knows system architecture; implement defense in depth",
+    mistake_5: "Ignoring security updates", solution_5: "Subscribe to security advisories; patch within 24-48 hours",
+    mistake_6: "Storing passwords in plain text", solution_6: "Use bcrypt/Argon2 for hashing; never store recoverable passwords",
+    op_errors: "Operational Errors",
+    mistake_7: "No backup verification", solution_7: "Monthly restoration drills",
+    mistake_8: "Running everything as root", solution_8: "Principle of least privilege; separate service accounts",
+    mistake_9: "No monitoring or alerting", solution_9: "Monitor disk, memory, CPU; alert on anomalies",
+    dev_practices: "Development Practices",
+    mistake_10: "Committing secrets to git", solution_10: "Use git-secrets pre-commit hook; scan repositories",
+    mistake_11: "No dependency management", solution_11: "Lock files committed; automated vulnerability scanning",
+    mistake_12: "Ignoring error handling", solution_12: "Structured error responses; no stack traces to client",
+    // Section 11 (new)
+    additional_attacks_title: "11. Additional Attack Vectors",
+    attack_ssrf: "Server-Side Request Forgery (SSRF)",
+    attack_ssrf_what: "Attacker tricks the server into making HTTP requests to internal resources",
+    attack_ssrf_how: "URL parameters passed to server-side HTTP clients without validation",
+    attack_ssrf_prevent: "Whitelist allowed domains, block private IP ranges (10.x, 172.16.x, 192.168.x, 169.254.x), use a dedicated egress proxy",
+    attack_path: "Path Traversal",
+    attack_path_what: "Access to files outside the intended directory by manipulating paths",
+    attack_path_how: "Input like ../../etc/passwd passed to file read functions",
+    attack_path_prevent: "Resolve and validate paths against allowed base directory; never expose raw user input to filesystem calls",
+    attack_clickjacking: "Clickjacking",
+    attack_clickjacking_what: "Attacker overlays invisible iframe to trick users into clicking hidden elements",
+    attack_clickjacking_how: "Your page embedded in malicious site's iframe",
+    attack_clickjacking_prevent: "Set X-Frame-Options: DENY and Content-Security-Policy: frame-ancestors 'none'",
+    attack_2fa: "Missing Multi-Factor Authentication",
+    attack_2fa_what: "Account takeover via credential stuffing or phishing even with strong passwords",
+    attack_2fa_how: "Leaked credential databases reused across services (credential stuffing)",
+    attack_2fa_prevent: "Enforce TOTP/WebAuthn for all admin access; consider passkeys (FIDO2) for users",
+    attack_secrets: "Hardcoded Secrets in Container Images",
+    attack_secrets_what: "Secrets baked into Docker image layers remain accessible even after deletion",
+    attack_secrets_how: "COPY .env or RUN commands with credentials in Dockerfile leave traces in image history",
+    attack_secrets_prevent: "Use --secret BuildKit mounts, inject secrets at runtime via environment variables or secrets managers",
+    // Section 12 (new)
+    secrets_title: "12. Secrets Management",
+    secrets_intro: "Never store secrets in code or Docker images. Use a dedicated secrets manager:",
+    secrets_tools: "Tools",
+    secrets_vault: "HashiCorp Vault: Self-hosted, dynamic secrets, fine-grained policies. Best for advanced setups.",
+    secrets_doppler: "Doppler: SaaS, syncs .env automatically per environment. Easy to start with.",
+    secrets_aws: "AWS Secrets Manager / Parameter Store: Native if already on AWS. Supports automatic rotation.",
+    secrets_infisical: "Infisical: Open-source alternative to Doppler, self-hostable.",
+    secrets_runtime: "Runtime Injection Pattern",
+    secrets_scan: "Scan for Leaked Secrets",
+    // Section 13 (new)
+    csp_title: "13. Content Security Policy (CSP)",
+    csp_intro: "CSP is one of the most powerful defenses against XSS. Many guides skip it — don't.",
+    csp_basics: "Basics",
+    csp_directives: "Key Directives",
+    csp_directive: "Directive", csp_purpose: "Purpose",
+    csp_d1: "Baseline: only load resources from same origin",
+    csp_d2: "Where JavaScript can be loaded from",
+    csp_d3: "Prevents your page being embedded (clickjacking)",
+    csp_d4: "Forces HTTP resources to be requested as HTTPS",
+    csp_d5: "Browser reports violations here — use in staging",
+    csp_warning: "Warning: Never use unsafe-inline or unsafe-eval in script-src — this defeats the purpose of CSP entirely. Use nonces instead.",
+    // Footer
+    footer_title: "Hosting & Web Security Guide",
+    last_updated: "Last updated: 2025 — Sections 11–13 added (SSRF, path traversal, MFA, secrets management, CSP)"
+  },
+
+  // ─────────────────────────────────────────────
+  //  RUSSIAN
+  // ─────────────────────────────────────────────
+  ru: {
+    title: "Хостинг и веб-безопасность",
+    subtitle: "Структурированное руководство по развёртыванию и защите веб-приложений",
+    author: 'Автор: <a href="https://github.com/tworjaga" target="_blank" rel="noopener">tworjaga</a> | Telegram: <a href="https://t.me/al7exy" target="_blank" rel="noopener">@al7exy</a>',
+    disclaimer: "ВНИМАНИЕ: Используйте на свой страх и риск. Это руководство содержит образовательный материал по защите систем. Всегда тестируйте конфигурации в изолированных средах перед развёртыванием в продакшн. Авторы не несут ответственности за ущерб или инциденты безопасности.",
+    toc_title: "Содержание",
+    toc_1: "1. Цель проекта", toc_2: "2. Основы хостинга", toc_3: "3. Пути развёртывания для начинающих",
+    toc_4: "4. Настройка VPS для продакшн", toc_5: "5. Практики безопасности",
+    toc_6: "6. Как вас могут взломать", toc_7: "7. CI/CD и DevOps",
+    toc_8: "8. Чеклист для продакшн", toc_9: "9. Пути обучения", toc_10: "10. Типичные ошибки новичков",
+    goal_title: "1. Цель проекта",
+    goal_intro: "Создать структурированное, технически точное руководство, которое учит:",
+    goal_1: "Как работает веб-хостинг", goal_2: "Как развёртывать сайты (статические и динамические)",
+    goal_3: "Как безопасно настраивать серверы", goal_4: "Как защищать инфраструктуру от типичных атак",
+    goal_5: "Как настраивать продакшн-окружение", goal_6: "Как мыслить о безопасности как инженер",
+    tone_label: "Тон:", tone_desc: "Ясный, практичный, без воды и маркетинга. Упор на реальные привычки.",
+    fundamentals_title: "2. Основы хостинга",
+    what_is_hosting: "Что такое хостинг",
+    hosting_desc: "Хостинг предоставляет инфраструктуру (серверы, хранилища, сеть) для доступности сайтов в интернете. Сервер — компьютер, работающий непрерывно и отдающий контент посетителям.",
+    types_hosting: "Типы хостинга",
+    table_type: "Тип", table_desc: "Описание", table_usecase: "Сценарий использования", table_control: "Уровень контроля",
+    shared_hosting: "Общий хостинг", shared_desc: "Несколько сайтов на одном сервере", shared_use: "Статические сайты, блоги", shared_control: "Минимальный",
+    vps: "VPS (Виртуальный сервер)", vps_desc: "Виртуализированный сервер с выделенными ресурсами", vps_use: "Веб-приложения, API", vps_control: "Полный root-доступ",
+    dedicated: "Выделенный сервер", dedicated_desc: "Физический сервер только для вас", dedicated_use: "Высоконагруженные приложения", dedicated_control: "Полный",
+    serverless: "Serverless", serverless_desc: "Облачные функции, без управления сервером", serverless_use: "Event-driven приложения", serverless_control: "Нет (управляемый)",
+    domain_dns: "Домен и DNS",
+    domain_desc: "Домен — читаемый адрес (example.com). DNS переводит домены в IP-адреса.",
+    ip_addresses: "IP-адреса",
+    ip_desc: "IPv4: 32-битный адрес (192.168.1.1). IPv6: 128-битный (2001:0db8::1). Публичные IP маршрутизируются в интернете; приватные — для локальных сетей.",
+    reverse_proxy: "Обратный прокси",
+    proxy_desc: "Сервер между клиентами и бэкендом. Обрабатывает SSL, балансировку нагрузки и кэширование. Варианты: Nginx, Caddy, Traefik.",
+    ssl_tls: "SSL/TLS",
+    ssl_desc: "TLS шифрует данные между клиентом и сервером. TLS 1.3 — текущий стандарт. Сертификаты выдаются Удостоверяющими Центрами (Let's Encrypt — бесплатно).",
+    beginner_title: "3. Пути развёртывания для начинающих",
+    path1_title: "Путь 1: GitHub Pages (статические сайты)",
+    path1_desc: "Бесплатный хостинг статических сайтов прямо из репозиториев GitHub.",
+    setup_steps: "Шаги настройки",
+    setup_1: "Создайте репозиторий: username.github.io",
+    setup_2: "Загрузите HTML/CSS/JS в ветку main",
+    setup_3: "Включите Pages в настройках репозитория",
+    folder_structure: "Структура папок",
+    common_mistakes: "Типичные ошибки",
+    mistake_g1: "Имя репозитория должно точно совпадать с именем пользователя",
+    mistake_g2: "index.html должен быть в корне или в папке /docs",
+    mistake_g3: "Чувствительность к регистру в путях файлов",
+    path2_title: "Путь 2: Vercel / Netlify",
+    path2_desc: "PaaS-платформы для фронтенд-фреймворков и статических сайтов.",
+    vercel_deploy: "Развёртывание Vercel",
+    netlify_deploy: "Развёртывание Netlify",
+    troubleshooting: "Решение проблем",
+    trouble_1: "Команда сборки должна выводить в правильную папку (dist/, build/)",
+    trouble_2: "Переменные окружения задаются в дашборде, не коммитируются",
+    trouble_3: "Редиректы требуют файл _redirects или netlify.toml/vercel.json",
+    path3_title: "Путь 3: Базовое развёртывание на VPS",
+    path3_desc: "Развёртывание на виртуальном сервере даёт полный контроль.",
+    prerequisites: "Требования",
+    prereq_1: "VPS от провайдера (DigitalOcean, Linode, Hetzner, AWS Lightsail)",
+    prereq_2: "SSH-клиент (OpenSSH на Linux/Mac, PuTTY на Windows)",
+    prereq_3: "Доменное имя (необязательно, но рекомендуется)",
+    connection: "Подключение",
+    vps_title: "4. Руководство по настройке VPS для продакшн",
+    step1: "Шаг 1: Первичный доступ к серверу", step2: "Шаг 2: Создание не-root пользователя",
+    step3: "Шаг 3: Аутентификация по SSH-ключу", local_machine: "На локальной машине:",
+    step4: "Шаг 4: Защита SSH", step5: "Шаг 5: Настройка файрвола (UFW)",
+    step6: "Шаг 6: Установка Docker", step7: "Шаг 7: Развёртывание приложения",
+    create_structure: "Создайте структуру приложения:",
+    step8: "Шаг 8: Обратный прокси с Caddy",
+    step9: "Шаг 9: SSL с Let's Encrypt (Caddy обрабатывает автоматически)",
+    ssl_auto: "Caddy автоматически выдаёт и обновляет сертификаты. Для ручного certbot с Nginx:",
+    step10: "Шаг 10: Управление процессами", systemd_service: "Создайте systemd-сервис для приложения:",
+    step11: "Шаг 11: Стратегия резервного копирования",
+    security_title: "5. Практики безопасности",
+    never_do: "Никогда не делайте это",
+    never_1: "SSH под root для рутинных операций", never_2: "Оставлять включённую аутентификацию по паролю",
+    never_3: "Коммитить .env файлы в систему контроля версий", never_4: "Открывать БД публично (MongoDB, Redis, PostgreSQL)",
+    never_5: "Хардкодить API-ключи в исходном коде", never_6: "Оставлять лишние открытые порты",
+    never_7: "Запускать приложения от root", never_8: "Отключать файрвол при отладке",
+    always_do: "Всегда делайте это",
+    always_1: "Используйте только SSH-ключи", always_2: "Строгие правила файрвола (запретить всё, разрешить нужное)",
+    always_3: "Установите Fail2ban", always_4: "Обязательный HTTPS с действительными сертификатами",
+    always_5: "Автоматическое или регулярное применение патчей безопасности", always_6: "Ведите подробные логи",
+    always_7: "Проверенные процедуры резервного копирования", always_8: "Принцип минимальных привилегий",
+    fail2ban_config: "Настройка Fail2ban",
+    auto_updates: "Автоматические обновления",
+    attacks_title: "6. Как вас могут взломать",
+    what_label: "Что:", how_label: "Как:", prevention_label: "Защита:",
+    attack_ssh: "Брутфорс SSH",
+    attack_ssh_what: "Автоматизированные попытки угадать SSH-учётные данные",
+    attack_ssh_how: "Боты сканируют интернет на порт 22, перебирают общие пароли",
+    attack_ssh_prevent: "Отключите аутентификацию по паролю, только ключи, перенесите SSH на нестандартный порт, установите Fail2ban",
+    attack_db: "Открытые MongoDB/Redis",
+    attack_db_what: "База данных доступна без аутентификации",
+    attack_db_how: "Стандартные конфигурации слушают 0.0.0.0 без пароля",
+    attack_db_prevent: "Привяжите к 127.0.0.1, включите аутентификацию, заблокируйте порты 27017/6379",
+    attack_sql: "SQL-инъекция",
+    attack_sql_what: "Вредоносные SQL-команды через пользовательский ввод",
+    attack_sql_how: "Несанированный ввод подставляется в запросы",
+    attack_sql_prevent: "Используйте параметризованные запросы/подготовленные выражения, ORM, валидацию ввода",
+    attack_xss: "Межсайтовый скриптинг (XSS)",
+    attack_xss_what: "Внедрение клиентских скриптов в веб-страницы",
+    attack_xss_how: "Пользовательский ввод отображается без кодирования",
+    attack_xss_prevent: "Кодирование вывода, Content Security Policy, HttpOnly cookies",
+    attack_csrf: "Межсайтовая подделка запросов (CSRF)",
+    attack_csrf_what: "Несанкционированные действия в аутентифицированной сессии",
+    attack_csrf_how: "Вредоносный сайт инициирует запросы к целевому сайту",
+    attack_csrf_prevent: "CSRF-токены, SameSite cookies, проверка заголовка Origin",
+    attack_supply: "Атаки на цепочку поставок",
+    attack_supply_what: "Компрометация через зависимости",
+    attack_supply_how: "Вредоносные npm-пакеты, скомпрометированные инструменты сборки",
+    attack_supply_prevent: "Фиксируйте зависимости (package-lock.json), проверяйте npm audit, приватный реестр",
+    attack_cors: "Неправильная настройка CORS",
+    attack_cors_what: "Излишне разрешительный обмен ресурсами между источниками",
+    attack_cors_how: "Access-Control-Allow-Origin: * на конфиденциальных эндпоинтах",
+    attack_cors_prevent: "Белый список разрешённых источников, валидация origin на сервере",
+    attack_docker: "Неправильная настройка Docker",
+    attack_docker_what: "Побег из контейнера или повышение привилегий",
+    attack_docker_how: "Запуск контейнеров от root, монтирование Docker socket",
+    attack_docker_prevent: "Запуск от непривилегированного пользователя, файловые системы только для чтения",
+    attack_env: "Утечки .env",
+    attack_env_what: "Раскрытие переменных окружения",
+    attack_env_how: "Закоммичено в git, раскрыто в сообщениях об ошибках",
+    attack_env_prevent: ".gitignore .env, проверка репозитория с git-secrets, менеджер секретов",
+    attack_s3: "Открытые S3-бакеты",
+    attack_s3_what: "Публично доступное облачное хранилище",
+    attack_s3_how: "Стандартные публичные разрешения, неправильная политика бакета",
+    attack_s3_prevent: "Блокировка публичного доступа, IAM-политики, регулярные аудиты",
+    cicd_title: "7. CI/CD и основы DevOps",
+    github_actions: "Развёртывание через GitHub Actions",
+    create_workflow: "Создайте .github/workflows/deploy.yml:",
+    secret_mgmt: "Управление секретами",
+    secret_1: "Храните секреты в GitHub Settings > Secrets and Variables",
+    secret_2: "Никогда не логируйте секреты в CI",
+    secret_3: "Регулярно ротируйте учётные данные",
+    secret_4: "Используйте краткосрочные токены везде, где возможно",
+    env_vars: "Переменные окружения",
+    rate_limiting: "Ограничение запросов",
+    rate_limit_desc: "Реализуйте на уровне обратного прокси или приложения:",
+    logging: "Логирование",
+    monitoring: "Мониторинг",
+    monitor_1: "Prometheus: сбор метрик и оповещения",
+    monitor_2: "Grafana: визуализация и дашборды",
+    monitor_3: "Ключевые метрики: CPU, память, диск, задержка запросов, частота ошибок",
+    monitor_4: "Мониторинг доступности: внешние проверки (UptimeRobot, Pingdom)",
+    cloudflare: "Основы Cloudflare",
+    checklist_title: "8. Чеклист для продакшн",
+    server_sec: "Безопасность сервера",
+    check_1: "Создан и настроен не-root пользователь", check_2: "Вход root по SSH отключён",
+    check_3: "Аутентификация по паролю отключена", check_4: "Аутентификация по SSH-ключу включена",
+    check_5: "Файрвол включён (UFW/iptables)", check_6: "Fail2ban установлен и активен",
+    check_7: "Автоматические обновления безопасности включены", check_8: "Ненужные сервисы отключены",
+    app_sec: "Безопасность приложения",
+    check_9: "HTTPS обязателен (HSTS включён)", check_10: "SSL-сертификат действителен и обновляется автоматически",
+    check_11: "Заголовки безопасности настроены", check_12: "Ограничение запросов реализовано",
+    check_13: "Валидация ввода на всех эндпоинтах", check_14: "Аутентификация и авторизация протестированы",
+    check_15: "Секреты не в репозитории", check_16: "Зависимости проверены на уязвимости",
+    data_prot: "Защита данных",
+    check_17: "База данных не доступна из интернета", check_18: "Аутентификация БД включена",
+    check_19: "Регулярные резервные копии настроены", check_20: "Восстановление из резервной копии протестировано",
+    check_21: "Шифрование в покое (если применимо)", check_22: "Шифрование в транзите (TLS 1.2+)",
+    monitor_maint: "Мониторинг и обслуживание",
+    check_23: "Логирование настроено и доступно", check_24: "Ротация логов включена",
+    check_25: "Проверки работоспособности реализованы", check_26: "Оповещения мониторинга настроены",
+    check_27: "План реагирования на инциденты задокументирован", check_28: "Документация актуальна",
+    paths_title: "9. Пути обучения",
+    beginner_path: "Безопасный путь новичка",
+    path_b1: "Начните с GitHub Pages для статических сайтов", path_b2: "Изучите основы DNS с кастомным доменом",
+    path_b3: "Перейдите на Netlify/Vercel с CI/CD", path_b4: "Изучите основы Linux",
+    path_b5: "Практикуйтесь с локальными Docker-контейнерами", path_b6: "Разверните первый VPS вручную",
+    path_b7: "Реализуйте базовое укрепление безопасности",
+    prod_path: "Безопасный путь к продакшн",
+    path_p1: "Infrastructure as Code (Terraform/Ansible)", path_p2: "Оркестрация контейнеров (Docker Compose/Kubernetes)",
+    path_p3: "CI/CD-пайплайн с автотестами", path_p4: "Централизованное логирование и мониторинг",
+    path_p5: "Автоматическое резервное копирование и аварийное восстановление", path_p6: "Сканирование безопасности в пайплайне",
+    path_p7: "Blue-green или canary-развёртывания",
+    mistakes_title: "10. Типичные ошибки новичков",
+    config_errors: "Ошибки конфигурации",
+    mistake_label: "Ошибка:", solution_label: "Решение:",
+    mistake_1: "Редактирование продакшн-конфигов напрямую без системы контроля версий",
+    solution_1: "Используйте управление конфигурацией или хотя бы документируйте изменения",
+    mistake_2: "Тестирование в продакшн", solution_2: "Поддерживайте отдельное стейджинг-окружение",
+    mistake_3: "Хардкодинг значений конфигурации", solution_3: "Переменные окружения для всех специфичных значений",
+    sec_oversights: "Упущения в безопасности",
+    mistake_4: '"Безопасность через неизвестность" (в надежде, что атакующие не найдут)',
+    solution_4: "Предполагайте, что атакующий знает архитектуру; реализуйте эшелонированную защиту",
+    mistake_5: "Игнорирование обновлений безопасности", solution_5: "Подпишитесь на бюллетени безопасности; патч в течение 24-48 часов",
+    mistake_6: "Хранение паролей в открытом виде", solution_6: "Используйте bcrypt/Argon2; никогда не храните восстанавливаемые пароли",
+    op_errors: "Операционные ошибки",
+    mistake_7: "Нет проверки резервных копий", solution_7: "Ежемесячные учения по восстановлению",
+    mistake_8: "Запуск всего под root", solution_8: "Принцип минимальных привилегий; отдельные сервисные аккаунты",
+    mistake_9: "Нет мониторинга или оповещений", solution_9: "Мониторьте диск, память, CPU; оповещения при аномалиях",
+    dev_practices: "Практики разработки",
+    mistake_10: "Коммит секретов в git", solution_10: "Используйте git-secrets pre-commit hook; сканируйте репозитории",
+    mistake_11: "Нет управления зависимостями", solution_11: "Фиксируйте версии; автоматическое сканирование уязвимостей",
+    mistake_12: "Игнорирование обработки ошибок", solution_12: "Структурированные ответы об ошибках; никаких стек-трейсов клиенту",
+    additional_attacks_title: "11. Дополнительные векторы атак",
+    attack_ssrf: "Подделка запросов на стороне сервера (SSRF)",
+    attack_ssrf_what: "Атакующий заставляет сервер делать HTTP-запросы к внутренним ресурсам",
+    attack_ssrf_how: "URL-параметры передаются HTTP-клиентам на сервере без валидации",
+    attack_ssrf_prevent: "Белый список разрешённых доменов, блокировка приватных IP, выделенный egress-прокси",
+    attack_path: "Обход пути (Path Traversal)",
+    attack_path_what: "Доступ к файлам вне предполагаемого каталога через манипуляцию путями",
+    attack_path_how: "Ввод вида ../../etc/passwd передаётся функциям чтения файлов",
+    attack_path_prevent: "Разрешайте и валидируйте пути относительно разрешённого базового каталога",
+    attack_clickjacking: "Кликджекинг",
+    attack_clickjacking_what: "Атакующий накладывает невидимый iframe, заставляя кликать на скрытые элементы",
+    attack_clickjacking_how: "Ваша страница встроена в iframe вредоносного сайта",
+    attack_clickjacking_prevent: "Установите X-Frame-Options: DENY и CSP frame-ancestors 'none'",
+    attack_2fa: "Отсутствие многофакторной аутентификации",
+    attack_2fa_what: "Захват аккаунта через credential stuffing или фишинг даже при сильных паролях",
+    attack_2fa_how: "Утечки баз учётных данных повторно используются на других сервисах",
+    attack_2fa_prevent: "Обязательный TOTP/WebAuthn для всего администрирования; passkeys (FIDO2) для пользователей",
+    attack_secrets: "Хардкодинг секретов в образах контейнеров",
+    attack_secrets_what: "Секреты, запечённые в слоях Docker-образа, остаются доступными даже после удаления",
+    attack_secrets_how: "COPY .env или RUN-команды с учётными данными оставляют следы в истории образа",
+    attack_secrets_prevent: "Используйте --secret BuildKit, внедряйте секреты в runtime через менеджеры секретов",
+    secrets_title: "12. Управление секретами",
+    secrets_intro: "Никогда не храните секреты в коде или Docker-образах. Используйте менеджер секретов:",
+    secrets_tools: "Инструменты",
+    secrets_vault: "HashiCorp Vault: Самохостинг, динамические секреты, гибкие политики.",
+    secrets_doppler: "Doppler: SaaS, автоматическая синхронизация .env по окружениям. Просто начать.",
+    secrets_aws: "AWS Secrets Manager / Parameter Store: Нативно для AWS. Поддерживает автоматическую ротацию.",
+    secrets_infisical: "Infisical: Open-source альтернатива Doppler, можно самохостить.",
+    secrets_runtime: "Паттерн внедрения в runtime",
+    secrets_scan: "Поиск утечек секретов",
+    csp_title: "13. Политика безопасности содержимого (CSP)",
+    csp_intro: "CSP — одна из самых мощных защит от XSS. Многие руководства её пропускают — не делайте так.",
+    csp_basics: "Основы",
+    csp_directives: "Ключевые директивы",
+    csp_directive: "Директива", csp_purpose: "Назначение",
+    csp_d1: "Базовый уровень: загружать ресурсы только из того же источника",
+    csp_d2: "Откуда можно загружать JavaScript",
+    csp_d3: "Запрещает встраивание вашей страницы (кликджекинг)",
+    csp_d4: "Заставляет HTTP-ресурсы запрашиваться как HTTPS",
+    csp_d5: "Браузер сообщает о нарушениях сюда — используйте при тестировании",
+    csp_warning: "Предупреждение: Никогда не используйте unsafe-inline или unsafe-eval в script-src — это полностью нивелирует CSP. Используйте nonce.",
+    footer_title: "Руководство по хостингу и веб-безопасности",
+    last_updated: "Последнее обновление: 2025 — Добавлены разделы 11–13 (SSRF, обход пути, MFA, управление секретами, CSP)"
+  },
+
+  // ─────────────────────────────────────────────
+  //  GERMAN
+  // ─────────────────────────────────────────────
+  de: {
+    title: "Hosting & Web-Sicherheit",
+    subtitle: "Ein strukturierter Leitfaden zur Bereitstellung und Absicherung von Webanwendungen",
+    author: 'Autor: <a href="https://github.com/tworjaga" target="_blank" rel="noopener">tworjaga</a> | Telegram: <a href="https://t.me/al7exy" target="_blank" rel="noopener">@al7exy</a>',
+    disclaimer: "WARNUNG: Verwendung auf eigene Gefahr. Dieser Leitfaden enthält Bildungsinhalte zur Systemsicherung. Teste Konfigurationen immer in isolierten Umgebungen vor dem Produktionseinsatz. Die Autoren übernehmen keine Haftung für Schäden oder Sicherheitsvorfälle.",
+    toc_title: "Inhaltsverzeichnis",
+    toc_1: "1. Projektziel", toc_2: "2. Hosting-Grundlagen", toc_3: "3. Einstiegspfade für Anfänger",
+    toc_4: "4. VPS-Produktionseinrichtung", toc_5: "5. Sicherheitspraktiken",
+    toc_6: "6. Wie man gehackt wird", toc_7: "7. CI/CD & DevOps-Grundlagen",
+    toc_8: "8. Produktions-Checkliste", toc_9: "9. Lernpfade", toc_10: "10. Typische Anfängerfehler",
+    goal_title: "1. Projektziel",
+    goal_intro: "Einen strukturierten, technisch korrekten Leitfaden erstellen, der lehrt:",
+    goal_1: "Wie Web-Hosting funktioniert", goal_2: "Wie man Webseiten bereitstellt (statisch und dynamisch)",
+    goal_3: "Wie man Server sicher konfiguriert", goal_4: "Wie man Infrastruktur vor typischen Angriffen schützt",
+    goal_5: "Wie man produktionsreife Umgebungen einrichtet", goal_6: "Wie man wie ein Ingenieur über Sicherheit denkt",
+    tone_label: "Ton:", tone_desc: "Klar, praxisnah, kein Ballast, keine Marketingsprache. Fokus auf reale Gewohnheiten.",
+    fundamentals_title: "2. Hosting-Grundlagen",
+    what_is_hosting: "Was ist Hosting",
+    hosting_desc: "Hosting stellt die Infrastruktur (Server, Speicher, Netzwerk) bereit, um Webseiten im Internet zugänglich zu machen. Ein Server ist ein Computer, der kontinuierlich läuft und Inhalte an Besucher ausliefert.",
+    types_hosting: "Hosting-Typen",
+    table_type: "Typ", table_desc: "Beschreibung", table_usecase: "Anwendungsfall", table_control: "Kontrollebene",
+    shared_hosting: "Shared Hosting", shared_desc: "Mehrere Webseiten auf einem Server", shared_use: "Statische Seiten, Blogs", shared_control: "Minimal",
+    vps: "VPS (Virtueller Privater Server)", vps_desc: "Virtualisierter Server mit dedizierten Ressourcen", vps_use: "Web-Apps, APIs", vps_control: "Voller Root-Zugriff",
+    dedicated: "Dedizierter Server", dedicated_desc: "Physischer Server ausschließlich für dich", dedicated_use: "Hochtraffic-Anwendungen", dedicated_control: "Vollständig",
+    serverless: "Serverless", serverless_desc: "Cloud-verwaltete Funktionen, kein Server-Management", serverless_use: "Event-getriebene Apps", serverless_control: "Keine (verwaltet)",
+    domain_dns: "Domain und DNS",
+    domain_desc: "Eine Domain ist eine lesbare Adresse (example.com). DNS übersetzt Domains in IP-Adressen.",
+    ip_addresses: "IP-Adressen",
+    ip_desc: "IPv4: 32-Bit-Adresse (192.168.1.1). IPv6: 128-Bit (2001:0db8::1). Öffentliche IPs sind im Internet routbar; private für lokale Netzwerke.",
+    reverse_proxy: "Reverse Proxy",
+    proxy_desc: "Ein Server zwischen Clients und Backend-Servern. Übernimmt SSL-Terminierung, Load Balancing und Caching. Gängige Implementierungen: Nginx, Caddy, Traefik.",
+    ssl_tls: "SSL/TLS",
+    ssl_desc: "TLS verschlüsselt Daten zwischen Client und Server. TLS 1.3 ist der aktuelle Standard. Zertifikate werden von Zertifizierungsstellen ausgestellt (Let's Encrypt, kostenlos).",
+    beginner_title: "3. Einstiegspfade für Anfänger",
+    path1_title: "Pfad 1: GitHub Pages (Statische Seiten)",
+    path1_desc: "Kostenloses Hosting für statische Webseiten direkt aus GitHub-Repositories.",
+    setup_steps: "Einrichtungsschritte",
+    setup_1: "Repository erstellen: username.github.io",
+    setup_2: "HTML/CSS/JS-Dateien in den main-Branch pushen",
+    setup_3: "Pages in den Repository-Einstellungen aktivieren",
+    folder_structure: "Ordnerstruktur",
+    common_mistakes: "Typische Fehler",
+    mistake_g1: "Repository-Name muss exakt mit dem Benutzernamen übereinstimmen",
+    mistake_g2: "Index.html muss im Root oder /docs-Ordner vorhanden sein",
+    mistake_g3: "Groß-/Kleinschreibung bei Dateipfaden beachten",
+    path2_title: "Pfad 2: Vercel / Netlify",
+    path2_desc: "Platform-as-a-Service für Frontend-Frameworks und statische Seiten.",
+    vercel_deploy: "Vercel-Bereitstellung",
+    netlify_deploy: "Netlify-Bereitstellung",
+    troubleshooting: "Fehlerbehebung",
+    trouble_1: "Build-Befehl muss in das korrekte Verzeichnis ausgeben (dist/, build/)",
+    trouble_2: "Umgebungsvariablen im Dashboard setzen, nicht committen",
+    trouble_3: "Weiterleitungen erfordern _redirects-Datei oder netlify.toml/vercel.json",
+    path3_title: "Pfad 3: Einfache VPS-Bereitstellung",
+    path3_desc: "Bereitstellung auf einem virtuellen Server bietet volle Kontrolle.",
+    prerequisites: "Voraussetzungen",
+    prereq_1: "VPS von Anbieter (DigitalOcean, Linode, Hetzner, AWS Lightsail)",
+    prereq_2: "SSH-Client (OpenSSH auf Linux/Mac, PuTTY auf Windows)",
+    prereq_3: "Domainname (optional, aber empfohlen)",
+    connection: "Verbindung",
+    vps_title: "4. VPS-Produktionseinrichtung",
+    step1: "Schritt 1: Erster Server-Zugriff", step2: "Schritt 2: Nicht-Root-Benutzer erstellen",
+    step3: "Schritt 3: SSH-Schlüssel-Authentifizierung", local_machine: "Auf lokalem Rechner:",
+    step4: "Schritt 4: SSH absichern", step5: "Schritt 5: Firewall konfigurieren (UFW)",
+    step6: "Schritt 6: Docker installieren", step7: "Schritt 7: Anwendung bereitstellen",
+    create_structure: "Anwendungsstruktur erstellen:",
+    step8: "Schritt 8: Reverse Proxy mit Caddy",
+    step9: "Schritt 9: SSL mit Let's Encrypt (Caddy übernimmt automatisch)",
+    ssl_auto: "Caddy stellt Zertifikate automatisch bereit und erneuert sie. Für manuelles certbot mit Nginx:",
+    step10: "Schritt 10: Prozessverwaltung", systemd_service: "systemd-Dienst für Anwendung erstellen:",
+    step11: "Schritt 11: Backup-Strategie",
+    security_title: "5. Sicherheitspraktiken",
+    never_do: "Niemals tun",
+    never_1: "SSH als root für Routineoperationen", never_2: "Passwort-Authentifizierung aktiviert lassen",
+    never_3: ".env-Dateien in Versionskontrolle committen", never_4: "Datenbanken öffentlich zugänglich machen",
+    never_5: "API-Schlüssel im Quellcode hardcoden", never_6: "Unnötige Ports offenlassen",
+    never_7: "Anwendungen als root ausführen", never_8: "Firewall zum Debuggen deaktivieren",
+    always_do: "Immer tun",
+    always_1: "Ausschließlich SSH-Schlüssel-Authentifizierung verwenden", always_2: "Strikte Firewall-Regeln (alles ablehnen, Spezifisches erlauben)",
+    always_3: "Fail2ban für Einbruchsprävention einsetzen", always_4: "HTTPS mit gültigen Zertifikaten erzwingen",
+    always_5: "Sicherheitsupdates automatisch oder regelmäßig einspielen", always_6: "Umfassendes Logging aktivieren",
+    always_7: "Getestete Backup-Verfahren pflegen", always_8: "Prinzip der minimalen Rechte anwenden",
+    fail2ban_config: "Fail2ban-Konfiguration",
+    auto_updates: "Automatische Updates",
+    attacks_title: "6. Wie man gehackt wird",
+    what_label: "Was:", how_label: "Wie:", prevention_label: "Prävention:",
+    attack_ssh: "SSH-Brute-Force",
+    attack_ssh_what: "Automatisierte Versuche, SSH-Zugangsdaten zu erraten",
+    attack_ssh_how: "Bots scannen das Internet nach Port 22 und probieren gängige Passwörter",
+    attack_ssh_prevent: "Passwort-Auth deaktivieren, nur Schlüssel, SSH auf nicht-Standard-Port, Fail2ban einsetzen",
+    attack_db: "Exponierte MongoDB/Redis",
+    attack_db_what: "Datenbank ohne Authentifizierung erreichbar",
+    attack_db_how: "Standardkonfigurationen binden an 0.0.0.0 ohne Passwort",
+    attack_db_prevent: "Nur an 127.0.0.1 binden, Auth aktivieren, Ports 27017/6379 per Firewall sperren",
+    attack_sql: "SQL-Injection",
+    attack_sql_what: "Schädliche SQL-Befehle durch Benutzereingaben",
+    attack_sql_how: "Unsanitisierte Eingaben in Abfragen zusammengefügt",
+    attack_sql_prevent: "Parametrisierte Abfragen/Prepared Statements, ORM-Frameworks, Eingabevalidierung",
+    attack_xss: "Cross-Site Scripting (XSS)",
+    attack_xss_what: "Einschleusen von Client-Skripten in Webseiten",
+    attack_xss_how: "Benutzereingaben werden ohne Kodierung angezeigt",
+    attack_xss_prevent: "Output-Encoding, Content Security Policy, HttpOnly-Cookies",
+    attack_csrf: "Cross-Site Request Forgery (CSRF)",
+    attack_csrf_what: "Unautorisierte Aktionen in einer authentifizierten Sitzung",
+    attack_csrf_how: "Schädliche Seite löst Anfragen an Zielseite aus",
+    attack_csrf_prevent: "CSRF-Token, SameSite-Cookies, Origin-Header validieren",
+    attack_supply: "Supply-Chain-Angriffe",
+    attack_supply_what: "Kompromittierung durch Abhängigkeiten",
+    attack_supply_how: "Schädliche npm-Pakete, kompromittierte Build-Tools",
+    attack_supply_prevent: "Abhängigkeiten fixieren (package-lock.json), npm audit, privates Registry",
+    attack_cors: "Fehlkonfiguriertes CORS",
+    attack_cors_what: "Zu permissives Cross-Origin Resource Sharing",
+    attack_cors_how: "Access-Control-Allow-Origin: * auf sensiblen Endpunkten",
+    attack_cors_prevent: "Erlaubte Origins whitelisten, Origin server-seitig validieren",
+    attack_docker: "Docker-Fehlkonfiguration",
+    attack_docker_what: "Container-Ausbruch oder Rechteeskalation",
+    attack_docker_how: "Container als root ausführen, Docker-Socket mounten",
+    attack_docker_prevent: "Als nicht-root-Benutzer ausführen, schreibgeschützte Dateisysteme, Capabilities droppen",
+    attack_env: ".env-Leaks",
+    attack_env_what: "Offenlegung von Umgebungsvariablen",
+    attack_env_how: "In Git committet, in Fehlermeldungen exponiert",
+    attack_env_prevent: ".gitignore .env, Repository mit git-secrets prüfen, Secret-Management nutzen",
+    attack_s3: "Offene S3-Buckets",
+    attack_s3_what: "Öffentlich zugänglicher Cloud-Speicher",
+    attack_s3_how: "Standard öffentliche Berechtigungen, fehlerhafte Bucket-Richtlinien",
+    attack_s3_prevent: "Öffentlichen Zugriff blockieren, IAM-Richtlinien, regelmäßige Audits",
+    cicd_title: "7. CI/CD & DevOps-Grundlagen",
+    github_actions: "GitHub Actions Bereitstellung",
+    create_workflow: "Erstelle .github/workflows/deploy.yml:",
+    secret_mgmt: "Secret-Verwaltung",
+    secret_1: "Secrets in GitHub Settings > Secrets and Variables speichern",
+    secret_2: "Secrets niemals in CI-Ausgabe loggen",
+    secret_3: "Zugangsdaten regelmäßig rotieren",
+    secret_4: "Kurzlebige Token verwenden, wo möglich",
+    env_vars: "Umgebungsvariablen",
+    rate_limiting: "Rate Limiting",
+    rate_limit_desc: "Auf Reverse-Proxy- oder Anwendungsebene implementieren:",
+    logging: "Logging",
+    monitoring: "Monitoring-Konzepte",
+    monitor_1: "Prometheus: Metrik-Sammlung und Alerting",
+    monitor_2: "Grafana: Visualisierung und Dashboards",
+    monitor_3: "Schlüsselmetriken: CPU, Speicher, Disk, Request-Latenz, Fehlerrate",
+    monitor_4: "Verfügbarkeits-Monitoring: Externe Health Checks (UptimeRobot, Pingdom)",
+    cloudflare: "Cloudflare-Grundlagen",
+    checklist_title: "8. Produktions-Checkliste",
+    server_sec: "Server-Sicherheit",
+    check_1: "Nicht-Root-Benutzer erstellt und konfiguriert", check_2: "SSH-Root-Login deaktiviert",
+    check_3: "Passwort-Authentifizierung deaktiviert", check_4: "SSH-Schlüssel-Authentifizierung erzwungen",
+    check_5: "Firewall aktiviert (UFW/iptables)", check_6: "Fail2ban installiert und aktiv",
+    check_7: "Automatische Sicherheitsupdates aktiviert", check_8: "Unnötige Dienste deaktiviert",
+    app_sec: "Anwendungssicherheit",
+    check_9: "HTTPS erzwungen (HSTS aktiviert)", check_10: "SSL-Zertifikat gültig und automatisch erneuernd",
+    check_11: "Sicherheits-Header konfiguriert", check_12: "Rate Limiting implementiert",
+    check_13: "Eingabevalidierung auf allen Endpunkten", check_14: "Authentifizierung und Autorisierung getestet",
+    check_15: "Secrets nicht im Code-Repository", check_16: "Abhängigkeiten auf Sicherheitslücken geprüft",
+    data_prot: "Datenschutz",
+    check_17: "Datenbank nicht im Internet exponiert", check_18: "Datenbank-Authentifizierung aktiviert",
+    check_19: "Regelmäßige Backups konfiguriert", check_20: "Backup-Wiederherstellung getestet",
+    check_21: "Verschlüsselung im Ruhezustand (falls zutreffend)", check_22: "Verschlüsselung bei der Übertragung (TLS 1.2+)",
+    monitor_maint: "Monitoring & Wartung",
+    check_23: "Logging konfiguriert und zugänglich", check_24: "Log-Rotation aktiviert",
+    check_25: "Health Checks implementiert", check_26: "Monitoring-Alerts konfiguriert",
+    check_27: "Incident-Response-Plan dokumentiert", check_28: "Dokumentation aktuell",
+    paths_title: "9. Lernpfade",
+    beginner_path: "Sicherer Einsteigerpfad",
+    path_b1: "Mit GitHub Pages für statische Seiten beginnen", path_b2: "DNS-Grundlagen mit eigener Domain lernen",
+    path_b3: "Zu Netlify/Vercel mit CI/CD wechseln", path_b4: "Linux-Grundlagen studieren",
+    path_b5: "Mit lokalen Docker-Containern üben", path_b6: "Ersten VPS manuell einrichten",
+    path_b7: "Grundlegendes Security Hardening implementieren",
+    prod_path: "Sicherer Produktionspfad",
+    path_p1: "Infrastructure as Code (Terraform/Ansible)", path_p2: "Container-Orchestrierung (Docker Compose/Kubernetes)",
+    path_p3: "CI/CD-Pipeline mit automatisierten Tests", path_p4: "Zentralisiertes Logging und Monitoring",
+    path_p5: "Automatisiertes Backup und Disaster Recovery", path_p6: "Security-Scanning in der Pipeline",
+    path_p7: "Blue-Green- oder Canary-Deployments",
+    mistakes_title: "10. Typische Anfängerfehler",
+    config_errors: "Konfigurationsfehler",
+    mistake_label: "Fehler:", solution_label: "Lösung:",
+    mistake_1: "Produktionskonfigurationen direkt ohne Versionskontrolle bearbeiten",
+    solution_1: "Konfigurationsmanagement verwenden oder zumindest Änderungen dokumentieren",
+    mistake_2: "In Produktion testen", solution_2: "Separate Staging-Umgebung pflegen",
+    mistake_3: "Konfigurationswerte hardcoden", solution_3: "Umgebungsvariablen für alle umgebungsspezifischen Werte",
+    sec_oversights: "Sicherheitslücken",
+    mistake_4: '"Security through Obscurity" (hoffen, dass Angreifer es nicht finden)',
+    solution_4: "Davon ausgehen, dass Angreifer die Systemarchitektur kennen; Defense in Depth implementieren",
+    mistake_5: "Sicherheitsupdates ignorieren", solution_5: "Sicherheits-Advisories abonnieren; innerhalb von 24-48 Stunden patchen",
+    mistake_6: "Passwörter im Klartext speichern", solution_6: "bcrypt/Argon2 für Hashing verwenden; nie wiederherstellbare Passwörter speichern",
+    op_errors: "Betriebsfehler",
+    mistake_7: "Keine Backup-Verifikation", solution_7: "Monatliche Wiederherstellungsübungen",
+    mistake_8: "Alles als root ausführen", solution_8: "Prinzip der minimalen Rechte; separate Service-Accounts",
+    mistake_9: "Kein Monitoring oder Alerting", solution_9: "Disk, Speicher, CPU überwachen; bei Anomalien alarmieren",
+    dev_practices: "Entwicklungspraktiken",
+    mistake_10: "Secrets in Git committen", solution_10: "git-secrets Pre-Commit-Hook verwenden; Repositories scannen",
+    mistake_11: "Kein Dependency-Management", solution_11: "Lock-Dateien committen; automatisches Schwachstellen-Scanning",
+    mistake_12: "Fehlerbehandlung ignorieren", solution_12: "Strukturierte Fehlerantworten; keine Stack-Traces an den Client",
+    additional_attacks_title: "11. Weitere Angriffsvektoren",
+    attack_ssrf: "Server-Side Request Forgery (SSRF)",
+    attack_ssrf_what: "Angreifer bringt den Server dazu, HTTP-Anfragen an interne Ressourcen zu stellen",
+    attack_ssrf_how: "URL-Parameter werden ohne Validierung an server-seitige HTTP-Clients übergeben",
+    attack_ssrf_prevent: "Erlaubte Domains whitelisten, private IP-Bereiche blockieren, dedizierten Egress-Proxy verwenden",
+    attack_path: "Pfad-Traversal",
+    attack_path_what: "Zugriff auf Dateien außerhalb des vorgesehenen Verzeichnisses durch Pfad-Manipulation",
+    attack_path_how: "Eingaben wie ../../etc/passwd werden an Dateilese-Funktionen übergeben",
+    attack_path_prevent: "Pfade gegen erlaubtes Basisverzeichnis auflösen und validieren",
+    attack_clickjacking: "Clickjacking",
+    attack_clickjacking_what: "Angreifer legt unsichtbares iframe darüber, um Klicks auf versteckte Elemente zu provozieren",
+    attack_clickjacking_how: "Deine Seite wird in einem iframe einer schädlichen Seite eingebettet",
+    attack_clickjacking_prevent: "X-Frame-Options: DENY und CSP frame-ancestors 'none' setzen",
+    attack_2fa: "Fehlende Multi-Faktor-Authentifizierung",
+    attack_2fa_what: "Account-Übernahme via Credential Stuffing oder Phishing, auch mit starken Passwörtern",
+    attack_2fa_how: "Gestohlene Anmeldedaten werden auf anderen Diensten wiederverwendet",
+    attack_2fa_prevent: "TOTP/WebAuthn für alle Admin-Zugriffe erzwingen; Passkeys (FIDO2) für Nutzer",
+    attack_secrets: "Hardcodierte Secrets in Container-Images",
+    attack_secrets_what: "In Docker-Image-Schichten eingebackene Secrets bleiben auch nach Löschung zugänglich",
+    attack_secrets_how: "COPY .env oder RUN-Befehle mit Zugangsdaten hinterlassen Spuren in der Image-History",
+    attack_secrets_prevent: "--secret BuildKit-Mounts verwenden, Secrets zur Laufzeit über Secret-Manager injizieren",
+    secrets_title: "12. Secret-Verwaltung",
+    secrets_intro: "Secrets niemals im Code oder in Docker-Images speichern. Einen dedizierten Secret-Manager verwenden:",
+    secrets_tools: "Werkzeuge",
+    secrets_vault: "HashiCorp Vault: Self-hosted, dynamische Secrets, feingranulare Richtlinien.",
+    secrets_doppler: "Doppler: SaaS, synchronisiert .env automatisch pro Umgebung. Einfacher Einstieg.",
+    secrets_aws: "AWS Secrets Manager / Parameter Store: Nativ für AWS. Unterstützt automatische Rotation.",
+    secrets_infisical: "Infisical: Open-Source-Alternative zu Doppler, selbst hostbar.",
+    secrets_runtime: "Runtime-Injection-Muster",
+    secrets_scan: "Nach geleakten Secrets suchen",
+    csp_title: "13. Content Security Policy (CSP)",
+    csp_intro: "CSP ist eine der wirksamsten Verteidigungen gegen XSS. Viele Anleitungen überspringen sie — nicht so.",
+    csp_basics: "Grundlagen",
+    csp_directives: "Wichtige Direktiven",
+    csp_directive: "Direktive", csp_purpose: "Zweck",
+    csp_d1: "Basis: Ressourcen nur vom gleichen Ursprung laden",
+    csp_d2: "Woher JavaScript geladen werden darf",
+    csp_d3: "Verhindert Einbettung deiner Seite (Clickjacking)",
+    csp_d4: "Zwingt HTTP-Ressourcen, als HTTPS angefragt zu werden",
+    csp_d5: "Browser meldet Verstöße hierhin — in Staging verwenden",
+    csp_warning: "Warnung: Niemals unsafe-inline oder unsafe-eval in script-src verwenden — das macht CSP wirkungslos. Stattdessen Nonces nutzen.",
+    footer_title: "Hosting & Web-Sicherheits-Leitfaden",
+    last_updated: "Zuletzt aktualisiert: 2025 — Abschnitte 11–13 hinzugefügt (SSRF, Pfad-Traversal, MFA, Secret-Verwaltung, CSP)"
+  }
+};
+
+// ─────────────────────────────────────────────
+//  Translation Engine
+// ─────────────────────────────────────────────
+let currentLang = 'en';
+
+function changeLanguage(lang) {
+  if (!translations[lang]) return;
+  currentLang = lang;
+
+  // Update html lang attribute
+  document.documentElement.lang = lang;
+
+  // Save preference
+  try { localStorage.setItem('lang', lang); } catch(e) {}
+
+  const t = translations[lang];
+  const elements = document.querySelectorAll('[data-i18n]');
+
+  elements.forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key] !== undefined) {
+      // Use innerHTML for keys that contain HTML (links, etc.)
+      const htmlKeys = ['author'];
+      if (htmlKeys.includes(key)) {
+        el.innerHTML = t[key];
+      } else {
+        el.textContent = t[key];
+      }
+    }
+  });
+
+  // Update the select to match
+  const sel = document.getElementById('languageSelect');
+  if (sel) sel.value = lang;
+}
+
+// Auto-detect on load
+(function() {
+  let lang = 'en';
+  try { lang = localStorage.getItem('lang') || 'en'; } catch(e) {}
+  // Fallback to browser language
+  if (lang === 'en') {
+    const browserLang = (navigator.language || '').toLowerCase().slice(0, 2);
+    if (translations[browserLang]) lang = browserLang;
+  }
+  changeLanguage(lang);
+})();
+</script>
 </body>
 </html>
