@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hosting & Web Security</title>
+    <style>
+        :root {
+            --bg-dark: #0d1117;
+            --bg-secondary: #161b22;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --accent-hover: #79c0ff;
+            --border: #30363d;
+            --danger: #f85149;
+            --warning: #f0883e;
+            --success: #238636;
+            --code-bg: #0d1117;
+        }
+
+        .language-selector {
+            position: absolute;
+            top: 2rem;
+            right: 2rem;
+        }
+
+        .language-selector select {
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .language-selector select:hover {
+            border-color: var(--accent);
+        }
+
+        .language-selector select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            position: relative;
+        }
+        
+        header {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+        
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        
+        .meta {
+            margin-top: 1rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        .meta a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        
+        .meta a:hover {
+            color: var(--accent-hover);
+            text-decoration: underline;
+        }
+        
+        .disclaimer {
+            background-color: rgba(248, 81, 73, 0.1);
+            border: 1px solid var(--danger);
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 2rem 0;
+            color: var(--danger);
+            font-weight: 600;
+        }
+        
+        nav {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        nav h2 {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+        
+        nav ul {
+            list-style: none;
+        }
+        
+        nav li {
+            margin: 0.5rem 0;
+        }
+        
+        nav a {
+            color: var(--accent);
+            text-decoration: none;
+            display: block;
+            padding: 0.3rem 0;
+        }
+        
+        nav a:hover {
+            color: var(--accent-hover);
+            text-decoration: underline;
+        }
+        
+        section {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        h2 {
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+        
+        h3 {
+            color: var(--text-primary);
+            margin: 1.5rem 0 1rem 0;
+            font-size: 1.2rem;
+        }
+        
+        h4 {
+            color: var(--text-secondary);
+            margin: 1.2rem 0 0.8rem 0;
+            font-size: 1rem;
+        }
+        
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+        
+        code {
+            background-color: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.9em;
+            color: var(--accent);
+        }
+        
+        pre {
+            background-color: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        
+        pre code {
+            background: none;
+            padding: 0;
+            color: var(--text-primary);
+        }
+        
+        .command {
+            color: #7ee787;
+        }
+        
+        .comment {
+            color: var(--text-secondary);
+        }
+        
+        .danger {
+            color: var(--danger);
+            font-weight: 600;
+        }
+        
+        .warning {
+            color: var(--warning);
+            font-weight: 600;
+        }
+        
+        .success {
+            color: var(--success);
+            font-weight: 600;
+        }
+        
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+        
+        li {
+            margin: 0.5rem 0;
+        }
+        
+        .checklist {
+            list-style: none;
+            margin-left: 0;
+        }
+        
+        .checklist li {
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        
+        .checklist li:before {
+            content: "[ ]";
+            position: absolute;
+            left: 0;
+            color: var(--text-secondary);
+            font-family: monospace;
+        }
+        
+        .checklist li.checked:before {
+            content: "[x]";
+            color: var(--success);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            text-align: left;
+        }
+        
+        th {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        
+        .path-box {
+            background-color: var(--bg-dark);
+            border-left: 4px solid var(--accent);
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .path-box h4 {
+            margin-top: 0;
+            color: var(--accent);
+        }
+        
+        .diagram {
+            background-color: var(--bg-dark);
+            border: 1px solid var(--border);
+            padding: 1rem;
+            font-family: monospace;
+            white-space: pre;
+            overflow-x: auto;
+            margin: 1rem 0;
+            color: var(--text-secondary);
+        }
+        
+        .attack-card {
+            background-color: rgba(248, 81, 73, 0.05);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--danger);
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .attack-card h4 {
+            color: var(--danger);
+            margin-top: 0;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border);
+            margin-top: 3rem;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            .language-selector {
+                position: relative;
+                top: 0;
+                right: 0;
+                margin-bottom: 1rem;
+                text-align: right;
+            }
+
+            .container {
+                padding: 0 15px;
+            }
+
+            header {
+                padding: 1.5rem 0;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .subtitle {
+                font-size: 1rem;
+            }
+
+            nav {
+                padding: 1rem;
+            }
+
+            nav ul {
+                margin-left: 0;
+            }
+
+            nav li {
+                margin: 0.3rem 0;
+            }
+
+            section {
+                padding: 1.5rem;
+                margin-bottom: 1.5rem;
+            }
+
+            h2 {
+                font-size: 1.3rem;
+            }
+
+            h3 {
+                font-size: 1.1rem;
+            }
+
+            h4 {
+                font-size: 0.95rem;
+            }
+
+            pre {
+                padding: 0.75rem;
+                font-size: 0.85rem;
+            }
+
+            code {
+                font-size: 0.85rem;
+            }
+
+            table {
+                font-size: 0.9rem;
+            }
+
+            th, td {
+                padding: 0.5rem;
+            }
+
+            .diagram {
+                font-size: 0.8rem;
+                padding: 0.75rem;
+            }
+
+            .attack-card {
+                padding: 0.75rem;
+            }
+
+            .path-box {
+                padding: 0.75rem;
+            }
+
+            ul, ol {
+                margin-left: 1rem;
+            }
+
+            .checklist li {
+                padding-left: 1.2rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.3rem;
+            }
+
+            .subtitle {
+                font-size: 0.9rem;
+            }
+
+            .meta {
+                font-size: 0.8rem;
+            }
+
+            section {
+                padding: 1rem;
+            }
+
+            h2 {
+                font-size: 1.2rem;
+            }
+
+            h3 {
+                font-size: 1rem;
+            }
+
+            pre {
+                padding: 0.5rem;
+                font-size: 0.8rem;
+            }
+
+            table {
+                font-size: 0.8rem;
+            }
+
+            th, td {
+                padding: 0.4rem;
+            }
+
+            .language-selector select {
+                padding: 0.4rem 0.8rem;
+                font-size: 0.85rem;
+            }
+        }
+
+        /* Touch-friendly improvements */
+        @media (hover: none) and (pointer: coarse) {
+            nav a {
+                padding: 0.5rem 0;
+            }
+
+            .language-selector select {
+                font-size: 16px; /* Prevent zoom on iOS */
+            }
+
+            a, button {
+                min-height: 44px;
+                min-width: 44px;
+            }
+        }
+    </style>
+
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="language-selector">
+                <select id="languageSelect" onchange="changeLanguage(this.value)" title="Select Language">
+                    <option value="en">English</option>
+                    <option value="ru">Русский</option>
+                    <option value="de">Deutsch</option>
+                </select>
+            </div>
+            <h1 data-i18n="title">Hosting & Web Security</h1>
+            <p class="subtitle" data-i18n="subtitle">A structured guide for deploying and securing web applications</p>
+            <div class="meta">
+                <p data-i18n="author">Author: <a href="https://github.com/tworjaga" target="_blank" rel="noopener">tworjaga</a> | Telegram: <a href="https://t.me/al7exy" target="_blank" rel="noopener">@al7exy</a></p>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="disclaimer" data-i18n="disclaimer">
+            WARNING: Use at your own risk. This guide provides educational content for securing systems. Always test configurations in isolated environments before production deployment. The authors assume no liability for damages or security incidents resulting from the use of this material.
+        </div>
+
+        <nav>
+            <h2 data-i18n="toc_title">Table of Contents</h2>
+            <ul>
+                <li><a href="#goal" data-i18n="toc_1">1. Project Goal</a></li>
+                <li><a href="#fundamentals" data-i18n="toc_2">2. Hosting Fundamentals</a></li>
+                <li><a href="#beginner-paths" data-i18n="toc_3">3. Beginner Deployment Paths</a></li>
+                <li><a href="#vps-setup" data-i18n="toc_4">4. VPS Production Setup</a></li>
+                <li><a href="#security" data-i18n="toc_5">5. Security Practices</a></li>
+                <li><a href="#attacks" data-i18n="toc_6">6. How You Get Hacked</a></li>
+                <li><a href="#cicd" data-i18n="toc_7">7. CI/CD & DevOps Basics</a></li>
+                <li><a href="#checklist" data-i18n="toc_8">8. Production Checklist</a></li>
+                <li><a href="#paths" data-i18n="toc_9">9. Learning Paths</a></li>
+                <li><a href="#mistakes" data-i18n="toc_10">10. Common Beginner Mistakes</a></li>
+            </ul>
+        </nav>
+
+        <section id="goal">
+            <h2 data-i18n="goal_title">1. Project Goal</h2>
+            <p data-i18n="goal_intro">Build a structured, technically correct guide that teaches:</p>
+            <ul>
+                <li data-i18n="goal_1">How web hosting works</li>
+                <li data-i18n="goal_2">How to deploy websites (static and dynamic)</li>
+                <li data-i18n="goal_3">How to configure servers securely</li>
+                <li data-i18n="goal_4">How to protect infrastructure from common attacks</li>
+                <li data-i18n="goal_5">How to set up production-ready environments</li>
+                <li data-i18n="goal_6">How to think about security like an engineer</li>
+            </ul>
+            <p><strong data-i18n="tone_label">Tone:</strong> <span data-i18n="tone_desc">Clear, practical, no fluff, no marketing language. Focus on real-world habits.</span></p>
+        </section>
+
+        <section id="fundamentals">
+            <h2 data-i18n="fundamentals_title">2. Hosting Fundamentals</h2>
+            
+            <h3 data-i18n="what_is_hosting">What is Hosting</h3>
+            <p data-i18n="hosting_desc">Hosting provides the infrastructure (servers, storage, network) to make websites accessible on the internet. A server is a computer that runs continuously, serving content to visitors.</p>
+            
+            <h3 data-i18n="types_hosting">Types of Hosting</h3>
+            <table>
+                <tr>
+                    <th data-i18n="table_type">Type</th>
+                    <th data-i18n="table_desc">Description</th>
+                    <th data-i18n="table_usecase">Use Case</th>
+                    <th data-i18n="table_control">Control Level</th>
+                </tr>
+                <tr>
+                    <td data-i18n="shared_hosting">Shared Hosting</td>
+                    <td data-i18n="shared_desc">Multiple websites on one server</td>
+                    <td data-i18n="shared_use">Static sites, blogs</td>
+                    <td data-i18n="shared_control">Minimal</td>
+                </tr>
+                <tr>
+                    <td data-i18n="vps">VPS (Virtual Private Server)</td>
+                    <td data-i18n="vps_desc">Virtualized server with dedicated resources</td>
+                    <td data-i18n="vps_use">Web apps, APIs</td>
+                    <td data-i18n="vps_control">Full root access</td>
+                </tr>
+                <tr>
+                    <td data-i18n="dedicated">Dedicated Server</td>
+                    <td data-i18n="dedicated_desc">Physical server exclusively yours</td>
+                    <td data-i18n="dedicated_use">High-traffic applications</td>
+                    <td data-i18n="dedicated_control">Complete</td>
+                </tr>
+                <tr>
+                    <td data-i18n="serverless">Serverless</td>
+                    <td data-i18n="serverless_desc">Cloud-managed functions, no server management</td>
+                    <td data-i18n="serverless_use">Event-driven apps</td>
+                    <td data-i18n="serverless_control">None (managed)</td>
+                </tr>
+            </table>
+
+            <h3 data-i18n="domain_dns">Domain and DNS</h3>
+            <p data-i18n="domain_desc">A domain is a human-readable address (example.com). DNS (Domain Name System) translates domains to IP addresses.</p>
+            
+            <div class="diagram">
+DNS Resolution Flow:
+
+User types: example.com
+    |
+    v
+DNS Resolver (ISP/8.8.8.8)
+    |
+    v
+Root DNS Server -> TLD Server (.com) -> Authoritative Server
+    |
+    v
+Returns IP: 192.0.2.1
+    |
+    v
+Browser connects to IP
+            </div>
+
+            <h3 data-i18n="ip_addresses">IP Addresses</h3>
+            <p data-i18n="ip_desc">IPv4: 32-bit address (192.168.1.1). IPv6: 128-bit address (2001:0db8::1). Public IPs are routable on the internet; private IPs are for local networks.</p>
+
+            <h3 data-i18n="reverse_proxy">Reverse Proxy</h3>
+            <p data-i18n="proxy_desc">A server that sits between clients and backend servers. Handles SSL termination, load balancing, and caching. Common implementations: Nginx, Caddy, Traefik.</p>
+
+            <div class="diagram">
+Client -> Reverse Proxy (Nginx) -> Application Server (Node.js/Python)
+             |
+             v
+        Static Files (Cache)
+            </div>
+
+            <h3 data-i18n="ssl_tls">SSL/TLS</h3>
+            <p data-i18n="ssl_desc">Transport Layer Security encrypts data between client and server. TLS 1.3 is current standard. Certificates are issued by Certificate Authorities (Let's Encrypt, free).</p>
+        </section>
+
+        <section id="beginner-paths">
+            <h2 data-i18n="beginner_title">3. Beginner Deployment Paths</h2>
+
+            <h3 data-i18n="path1_title">Path 1: GitHub Pages (Static Sites)</h3>
+            <p data-i18n="path1_desc">Free hosting for static websites directly from GitHub repositories.</p>
+            
+            <h4 data-i18n="setup_steps">Setup Steps</h4>
+            <ol>
+                <li data-i18n="setup_1">Create repository: username.github.io</li>
+                <li data-i18n="setup_2">Push HTML/CSS/JS files to main branch</li>
+                <li data-i18n="setup_3">Enable Pages in repository settings</li>
+            </ol>
+
+            <h4 data-i18n="folder_structure">Folder Structure</h4>
+            <pre><code>username.github.io/
+├── index.html
+├── css/
+│   └── style.css
+├── js/
+│   └── app.js
+└── assets/
+    └── images/</code></pre>
+
+            <h4 data-i18n="common_mistakes">Common Mistakes</h4>
+            <ul>
+                <li data-i18n="mistake_g1">Repository name must match username exactly</li>
+                <li data-i18n="mistake_g2">Index.html must exist in root or /docs folder</li>
+                <li data-i18n="mistake_g3">Case sensitivity issues on file paths</li>
+            </ul>
+
+            <h3 data-i18n="path2_title">Path 2: Vercel / Netlify</h3>
+            <p data-i18n="path2_desc">Platform-as-a-Service for frontend frameworks and static sites.</p>
+
+            <h4 data-i18n="vercel_deploy">Vercel Deployment</h4>
+            <pre><code class="command"># Install CLI
+npm i -g vercel
+
+# Login
+vercel login
+
+# Deploy
+vercel --prod</code></pre>
+
+            <h4 data-i18n="netlify_deploy">Netlify Deployment</h4>
+            <pre><code class="command"># Install CLI
+npm install -g netlify-cli
+
+# Login
+netlify login
+
+# Deploy
+netlify deploy --prod --dir=build</code></pre>
+
+            <h4 data-i18n="troubleshooting">Troubleshooting</h4>
+            <ul>
+                <li data-i18n="trouble_1">Build command must output to correct directory (dist/, build/)</li>
+                <li data-i18n="trouble_2">Environment variables set in dashboard, not committed</li>
+                <li data-i18n="trouble_3">Redirects require _redirects file or netlify.toml/vercel.json</li>
+            </ul>
+
+            <h3 data-i18n="path3_title">Path 3: Basic VPS Deployment</h3>
+            <p data-i18n="path3_desc">Deploying to a virtual private server provides full control.</p>
+
+            <h4 data-i18n="prerequisites">Prerequisites</h4>
+            <ul>
+                <li data-i18n="prereq_1">VPS from provider (DigitalOcean, Linode, Hetzner, AWS Lightsail)</li>
+                <li data-i18n="prereq_2">SSH client (OpenSSH on Linux/Mac, PuTTY on Windows)</li>
+                <li data-i18n="prereq_3">Domain name (optional but recommended)</li>
+            </ul>
+
+            <h4 data-i18n="connection">Connection</h4>
+            <pre><code class="command"># Default connection (password auth - temporary)
+ssh root@your_server_ip
+
+# Verify host key fingerprint matches provider dashboard</code></pre>
+        </section>
+
+        <section id="vps-setup">
+            <h2 data-i18n="vps_title">4. VPS Production Setup Guide</h2>
+
+            <h3 data-i18n="step1">Step 1: Initial Server Access</h3>
+            <pre><code class="command"># Connect as root (only for initial setup)
+ssh root@server_ip
+
+# Update system packages
+apt update && apt upgrade -y
+
+# Install essential tools
+apt install -y curl wget vim ufw fail2ban</code></pre>
+
+            <h3 data-i18n="step2">Step 2: Create Non-Root User</h3>
+            <pre><code class="command"># Create user
+adduser deploy
+
+# Add to sudo group
+usermod -aG sudo deploy
+
+# Switch to new user
+su - deploy
+
+# Verify sudo access
+sudo whoami</code></pre>
+
+            <h3 data-i18n="step3">Step 3: SSH Key Authentication</h3>
+            <p data-i18n="local_machine">On local machine:</p>
+            <pre><code class="command"># Generate SSH key pair (if not exists)
+ssh-keygen -t ed25519 -C "your_email@example.com"
+
+# Copy public key to server
+ssh-copy-id -i ~/.ssh/id_ed25519.pub deploy@server_ip</code></pre>
+
+            <h3 data-i18n="step4">Step 4: Secure SSH Configuration</h3>
+            <pre><code class="command"># Edit SSH config
+sudo nano /etc/ssh/sshd_config
+
+# Modify these lines:
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+PermitEmptyPasswords no
+MaxAuthTries 3
+
+# Restart SSH
+sudo systemctl restart sshd</code></pre>
+
+            <h3 data-i18n="step5">Step 5: Configure Firewall (UFW)</h3>
+            <pre><code class="command"># Default deny
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# Allow SSH (before enabling)
+sudo ufw allow 22/tcp
+
+# Allow HTTP/HTTPS
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+# Enable firewall
+sudo ufw enable
+
+# Check status
+sudo ufw status verbose</code></pre>
+
+            <h3 data-i18n="step6">Step 6: Install Docker</h3>
+            <pre><code class="command"># Remove old versions
+sudo apt remove docker docker-engine docker.io
+
+# Install dependencies
+sudo apt install -y apt-transport-https ca-certificates gnupg lsb-release
+
+# Add Docker GPG key
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+# Add repository
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Install Docker
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io
+
+# Add user to docker group
+sudo usermod -aG docker deploy
+
+# Verify
+docker --version</code></pre>
+
+            <h3 data-i18n="step7">Step 7: Application Deployment</h3>
+            <p data-i18n="create_structure">Create application structure:</p>
+            <pre><code>mkdir -p ~/app
+cd ~/app
+
+# Create Dockerfile
+cat > Dockerfile << 'EOF'
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+EXPOSE 3000
+USER node
+CMD ["node", "server.js"]
+EOF</code></pre>
+
+            <h3 data-i18n="step8">Step 8: Reverse Proxy with Caddy</h3>
+            <pre><code class="command"># Install Caddy
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update
+sudo apt install caddy
+
+# Configure Caddyfile
+sudo nano /etc/caddy/Caddyfile</code></pre>
+
+            <pre><code>example.com {
+    reverse_proxy localhost:3000
+    encode gzip
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+    }
+}</code></pre>
+
+            <pre><code class="command"># Reload Caddy
+sudo systemctl reload caddy
+
+# Enable auto-start
+sudo systemctl enable caddy</code></pre>
+
+            <h3 data-i18n="step9">Step 9: SSL with Let's Encrypt (Caddy handles automatically)</h3>
+            <p data-i18n="ssl_auto">Caddy automatically provisions and renews certificates. For manual certbot with Nginx:</p>
+            <pre><code class="command">sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d example.com -d www.example.com
+
+# Auto-renewal test
+sudo certbot renew --dry-run</code></pre>
+
+            <h3 data-i18n="step10">Step 10: Process Management</h3>
+            <p data-i18n="systemd_service">Create systemd service for application:</p>
+            <pre><code>sudo nano /etc/systemd/system/myapp.service</code></pre>
+            <pre><code>[Unit]
+Description=My Application
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/home/deploy/app
+ExecStart=/usr/bin/docker run --rm -p 3000:3000 myapp:latest
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+
+            <pre><code class="command">sudo systemctl daemon-reload
+sudo systemctl enable myapp
+sudo systemctl start myapp
+
+# Check logs
+sudo journalctl -u myapp -f</code></pre>
+
+            <h3 data-i18n="step11">Step 11: Backup Strategy</h3>
+            <pre><code class="command"># Install restic for backups
+sudo apt install restic
+
+# Initialize backup repository
+restic init --repo /backup/repo
+
+# Create backup script
+cat > ~/backup.sh << 'EOF'
+#!/bin/bash
+export RESTIC_PASSWORD="your-secure-password"
+restic -r /backup/repo backup /home/deploy/app/data
+restic -r /backup/repo forget --keep-last 7 --keep-daily 30
+EOF
+
+chmod +x ~/backup.sh
+
+# Add to crontab (daily at 2 AM)
+0 2 * * * /home/deploy/backup.sh</code></pre>
+        </section>
+
+        <section id="security">
+            <h2 data-i18n="security_title">5. Security Practices</h2>
+
+            <h3 data-i18n="never_do">Never Do This</h3>
+            <ul class="checklist">
+                <li data-i18n="never_1">SSH as root for routine operations</li>
+                <li data-i18n="never_2">Leave password authentication enabled</li>
+                <li data-i18n="never_3">Commit .env files to version control</li>
+                <li data-i18n="never_4">Expose databases publicly (MongoDB, Redis, PostgreSQL)</li>
+                <li data-i18n="never_5">Hardcode API keys in source code</li>
+                <li data-i18n="never_6">Leave unnecessary ports open</li>
+                <li data-i18n="never_7">Run applications as root</li>
+                <li data-i18n="never_8">Disable firewall for debugging</li>
+            </ul>
+
+            <h3 data-i18n="always_do">Always Do This</h3>
+            <ul class="checklist">
+                <li class="checked" data-i18n="always_1">Use SSH key authentication exclusively</li>
+                <li class="checked" data-i18n="always_2">Implement strict firewall rules (deny all, allow specific)</li>
+                <li class="checked" data-i18n="always_3">Deploy Fail2ban for intrusion prevention</li>
+                <li class="checked" data-i18n="always_4">Enforce HTTPS with valid certificates</li>
+                <li class="checked" data-i18n="always_5">Apply security updates automatically or regularly</li>
+                <li class="checked" data-i18n="always_6">Enable comprehensive logging</li>
+                <li class="checked" data-i18n="always_7">Maintain tested backup procedures</li>
+                <li class="checked" data-i18n="always_8">Use principle of least privilege</li>
+            </ul>
+
+            <h3 data-i18n="fail2ban_config">Fail2ban Configuration</h3>
+            <pre><code class="command">sudo apt install fail2ban
+
+sudo tee /etc/fail2ban/jail.local << 'EOF'
+[DEFAULT]
+bantime = 3600
+findtime = 600
+maxretry = 3
+backend = systemd
+
+[sshd]
+enabled = true
+port = 22
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+bantime = 3600
+EOF
+
+sudo systemctl enable fail2ban
+sudo systemctl start fail2ban
+
+# Check status
+sudo fail2ban-client status sshd</code></pre>
+
+            <h3 data-i18n="auto_updates">Automatic Updates</h3>
+            <pre><code class="command">sudo apt install unattended-upgrades
+sudo dpkg-reconfigure -plow unattended-upgrades</code></pre>
+        </section>
+
+        <section id="attacks">
+            <h2 data-i18n="attacks_title">6. How You Get Hacked</h2>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_ssh">SSH Brute Force</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_ssh_what">Automated attempts to guess SSH credentials</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_ssh_how">Bots scan internet for port 22, try common passwords</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_ssh_prevent">Disable password auth, use keys only, move SSH to non-standard port, deploy Fail2ban</span></p>
+            </div>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_db">Exposed MongoDB/Redis</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_db_what">Database accessible without authentication</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_db_how">Default configurations bind to 0.0.0.0 without password</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_db_prevent">Bind to 127.0.0.1 only, enable auth, firewall block port 27017/6379</span></p>
+            </div>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_sql">SQL Injection</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_sql_what">Malicious SQL commands through user input</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_sql_how">Unsanitized input concatenated into queries</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_sql_prevent">Use parameterized queries/prepared statements, ORM frameworks, input validation</span></p>
+            </div>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_xss">Cross-Site Scripting (XSS)</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_xss_what">Injection of client-side scripts into web pages</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_xss_how">User input displayed without encoding</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_xss_prevent">Output encoding, Content Security Policy, HttpOnly cookies</span></p>
+            </div>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_csrf">Cross-Site Request Forgery (CSRF)</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_csrf_what">Unauthorized actions performed on authenticated session</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_csrf_how">Malicious site triggers requests to target site</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_csrf_prevent">CSRF tokens, SameSite cookies, validate Origin header</span></p>
+            </div>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_supply">Supply Chain Attacks</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_supply_what">Compromise through dependencies</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_supply_how">Malicious npm packages, compromised build tools</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_supply_prevent">Lock dependencies (package-lock.json), audit with npm audit, private registry</span></p>
+            </div>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_cors">Misconfigured CORS</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_cors_what">Overly permissive cross-origin resource sharing</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_cors_how">Access-Control-Allow-Origin: * on sensitive endpoints</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_cors_prevent">Whitelist specific origins, validate origin server-side</span></p>
+            </div>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_docker">Docker Misconfiguration</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_docker_what">Container escape or privilege escalation</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_docker_how">Running containers as root, mounting Docker socket</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_docker_prevent">Run as non-root user, read-only filesystems, drop capabilities</span></p>
+            </div>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_env">.env Leaks</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_env_what">Exposure of environment variables</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_env_how">Committed to git, exposed in error messages</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_env_prevent">.gitignore .env, validate no secrets in repo with git-secrets, use secret management</span></p>
+            </div>
+
+            <div class="attack-card">
+                <h4 data-i18n="attack_s3">Open S3 Buckets</h4>
+                <p><strong data-i18n="what_label">What:</strong> <span data-i18n="attack_s3_what">Publicly accessible cloud storage</span></p>
+                <p><strong data-i18n="how_label">How:</strong> <span data-i18n="attack_s3_how">Default public permissions, misconfigured bucket policies</span></p>
+                <p><strong data-i18n="prevention_label">Prevention:</strong> <span data-i18n="attack_s3_prevent">Block public access settings, IAM policies, regular audits</span></p>
+            </div>
+        </section>
+
+        <section id="cicd">
+            <h2 data-i18n="cicd_title">7. CI/CD & DevOps Basics</h2>
+
+            <h3 data-i18n="github_actions">GitHub Actions Deployment</h3>
+            <p data-i18n="create_workflow">Create .github/workflows/deploy.yml:</p>
+            <pre><code>name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run tests
+        run: npm test
+        
+      - name: Build
+        run: npm run build
+        
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /home/deploy/app
+            git pull origin main
+            docker build -t myapp:latest .
+            docker stop myapp || true
+            docker rm myapp || true
+            docker run -d --name myapp -p 3000:3000 myapp:latest</code></pre>
+
+            <h3 data-i18n="secret_mgmt">Secret Management</h3>
+            <ul>
+                <li data-i18n="secret_1">Store secrets in GitHub Settings > Secrets and Variables</li>
+                <li data-i18n="secret_2">Never log secrets in CI output</li>
+                <li data-i18n="secret_3">Rotate credentials regularly</li>
+                <li data-i18n="secret_4">Use short-lived tokens where possible</li>
+            </ul>
+
+            <h3 data-i18n="env_vars">Environment Variables</h3>
+            <pre><code class="command"># Production .env file (not committed)
+NODE_ENV=production
+DATABASE_URL=postgresql://user:pass@localhost/db
+JWT_SECRET=use-random-256-bit-string-here
+API_KEY=external-service-key</code></pre>
+
+            <h3 data-i18n="rate_limiting">Rate Limiting</h3>
+            <p data-i18n="rate_limit_desc">Implement at reverse proxy or application level:</p>
+            <pre><code># Nginx rate limiting
+limit_req_zone $binary_remote_addr zone=one:10m rate=10r/s;
+
+server {
+    location /api/ {
+        limit_req zone=one burst=20 nodelay;
+    }
+}</code></pre>
+
+            <h3 data-i18n="logging">Logging</h3>
+            <pre><code class="command"># Centralized logging with journald
+sudo journalctl -u myapp -f -n 100
+
+# Structured logging format (JSON)
+{"timestamp":"2024-01-01T00:00:00Z","level":"error","message":"DB connection failed","request_id":"uuid"}</code></pre>
+
+            <h3 data-i18n="monitoring">Monitoring Concepts</h3>
+            <ul>
+                <li data-i18n="monitor_1"><strong>Prometheus:</strong> Metrics collection and alerting</li>
+                <li data-i18n="monitor_2"><strong>Grafana:</strong> Visualization and dashboards</li>
+                <li data-i18n="monitor_3"><strong>Key metrics:</strong> CPU, memory, disk, request latency, error rates</li>
+                <li data-i18n="monitor_4"><strong>Uptime monitoring:</strong> External health checks (UptimeRobot, Pingdom)</li>
+            </ul>
+
+            <h3 data-i18n="cloudflare">Cloudflare Basics</h3>
+            <pre><code class="command"># DNS configuration
+Type: A
+Name: example.com
+Content: your_server_ip
+Proxy status: Proxied (orange cloud)
+
+# Always Use HTTPS: On
+# Security Level: Medium
+# Browser Cache TTL: 4 hours</code></pre>
+        </section>
+
+        <section id="checklist">
+            <h2 data-i18n="checklist_title">8. Production Checklist</h2>
+
+            <h3 data-i18n="server_sec">Server Security</h3>
+            <ul class="checklist">
+                <li data-i18n="check_1">Non-root user created and configured</li>
+                <li data-i18n="check_2">SSH root login disabled</li>
+                <li data-i18n="check_3">Password authentication disabled</li>
+                <li data-i18n="check_4">SSH key authentication enforced</li>
+                <li data-i18n="check_5">Firewall enabled (UFW/iptables)</li>
+                <li data-i18n="check_6">Fail2ban installed and active</li>
+                <li data-i18n="check_7">Automatic security updates enabled</li>
+                <li data-i18n="check_8">Unnecessary services disabled</li>
+            </ul>
+
+            <h3 data-i18n="app_sec">Application Security</h3>
+            <ul class="checklist">
+                <li data-i18n="check_9">HTTPS enforced (HSTS enabled)</li>
+                <li data-i18n="check_10">SSL certificate valid and auto-renewing</li>
+                <li data-i18n="check_11">Security headers configured</li>
+                <li data-i18n="check_12">Rate limiting implemented</li>
+                <li data-i18n="check_13">Input validation on all endpoints</li>
+                <li data-i18n="check_14">Authentication and authorization tested</li>
+                <li data-i18n="check_15">Secrets not in code repository</li>
+                <li data-i18n="check_16">Dependencies scanned for vulnerabilities</li>
+            </ul>
+
+            <h3 data-i18n="data_prot">Data Protection</h3>
+            <ul class="checklist">
+                <li data-i18n="check_17">Database not exposed to internet</li>
+                <li data-i18n="check_18">Database authentication enabled</li>
+                <li data-i18n="check_19">Regular backups configured</li>
+                <li data-i18n="check_20">Backup restoration tested</li>
+                <li data-i18n="check_21">Encryption at rest (if applicable)</li>
+                <li data-i18n="check_22">Encryption in transit (TLS 1.2+)</li>
+            </ul>
+
+            <h3 data-i18n="monitor_maint">Monitoring & Maintenance</h3>
+            <ul class="checklist">
+                <li data-i18n="check_23">Logging configured and accessible</li>
+                <li data-i18n="check_24">Log rotation enabled</li>
+                <li data-i18n="check_25">Health checks implemented</li>
+                <li data-i18n="check_26">Monitoring alerts configured</li>
+                <li data-i18n="check_27">Incident response plan documented</li>
+                <li data-i18n="check_28">Documentation current</li>
+            </ul>
+        </section>
+
+        <section id="paths">
+            <h2 data-i18n="paths_title">9. Learning Paths</h2>
+
+            <div class="path-box">
+                <h4 data-i18n="beginner_path">Beginner Safe Path</h4>
+                <ol>
+                    <li data-i18n="path_b1">Start with GitHub Pages for static sites</li>
+                    <li data-i18n="path_b2">Learn DNS basics with custom domain</li>
+                    <li data-i18n="path_b3">Progress to Netlify/Vercel with CI/CD</li>
+                    <li data-i18n="path_b4">Study Linux fundamentals</li>
+                    <li data-i18n="path_b5">Practice with local Docker containers</li>
+                    <li data-i18n="path_b6">Deploy first VPS with manual setup</li>
+                    <li data-i18n="path_b7">Implement basic security hardening</li>
+                </ol>
+            </div>
+
+            <div class="path-box">
+                <h4 data-i18n="prod_path">Production Safe Path</h4>
+                <ol>
+                    <li data-i18n="path_p1">Infrastructure as Code (Terraform/Ansible)</li>
+                    <li data-i18n="path_p2">Container orchestration (Docker Compose/Kubernetes)</li>
+                    <li data-i18n="path_p3">CI/CD pipeline with automated testing</li>
+                    <li data-i18n="path_p4">Centralized logging and monitoring</li>
+                    <li data-i18n="path_p5">Automated backup and disaster recovery</li>
+                    <li data-i18n="path_p6">Security scanning in pipeline</li>
+                    <li data-i18n="path_p7">Blue-green or canary deployments</li>
+                </ol>
+            </div>
+        </section>
+
+        <section id="mistakes">
+            <h2 data-i18n="mistakes_title">10. Common Beginner Mistakes</h2>
+
+            <h3 data-i18n="config_errors">Configuration Errors</h3>
+            <ul>
+                <li><span class="danger" data-i18n="mistake_label">Mistake:</span> <span data-i18n="mistake_1">Editing production configs directly without version control</span></li>
+                <li><span class="success" data-i18n="solution_label">Solution:</span> <span data-i18n="solution_1">Use configuration management or at minimum document changes</span></li>
+                
+                <li><span class="danger" data-i18n="mistake_label">Mistake:</span> <span data-i18n="mistake_2">Testing in production</span></li>
+                <li><span class="success" data-i18n="solution_label">Solution:</span> <span data-i18n="solution_2">Maintain separate staging environment</span></li>
+                
+                <li><span class="danger" data-i18n="mistake_label">Mistake:</span> <span data-i18n="mistake_3">Hardcoding configuration values</span></li>
+                <li><span class="success" data-i18n="solution_label">Solution:</span> <span data-i18n="solution_3">Environment variables for all environment-specific values</span></li>
+            </ul>
+
+            <h3 data-i18n="sec_oversights">Security Oversights</h3>
+            <ul>
+                <li><span class="danger" data-i18n="mistake_label">Mistake:</span> <span data-i18n="mistake_4">"Security through obscurity" (hoping attackers won't find it)</span></li>
+                <li><span class="success" data-i18n="solution_label">Solution:</span> <span data-i18n="solution_4">Assume attacker knows system architecture; implement defense in depth</span></li>
+                
+                <li><span class="danger" data-i18n="mistake_label">Mistake:</span> <span data-i18n="mistake_5">Ignoring security updates</span></li>
+                <li><span class="success" data-i18n="solution_label">Solution:</span> <span data-i18n="solution_5">Subscribe to security advisories; patch within 24-48 hours</span></li>
+                
+                <li><span class="danger" data-i18n="mistake_label">Mistake:</span> <span data-i18n="mistake_6">Storing passwords in plain text</span></li>
+                <li><span class="success" data-i18n="solution_label">Solution:</span> <span data-i18n="solution_6">Use bcrypt/Argon2 for hashing; never store recoverable passwords</span></li>
+            </ul>
+
+            <h3 data-i18n="op_errors">Operational Errors</h3>
+            <ul>
+                <li><span class="danger" data-i18n="mistake_label">Mistake:</span> <span data-i18n="mistake_7">No backup verification</span></li>
+                <li><span class="success" data-i18n="solution_label">Solution:</span> <span data-i18n="solution_7">Monthly restoration drills</span></li>
+                
+                <li><span class="danger" data-i18n="mistake_label">Mistake:</span> <span data-i18n="mistake_8">Running everything as root</span></li>
+                <li><span class="success" data-i18n="solution_label">Solution:</span> <span data-i18n="solution_8">Principle of least privilege; separate service accounts</span></li>
+                
+                <li><span class="danger" data-i18n="mistake_label">Mistake:</span> <span data-i18n="mistake_9">No monitoring or alerting</span></li>
+                <li><span class="success" data-i18n="solution_label">Solution:</span> <span data-i18n="solution_9">Monitor disk, memory, CPU; alert on anomalies</span></li>
+            </ul>
+
+            <h3 data-i18n="dev_practices">Development Practices</h3>
+            <ul>
+                <li><span class="danger" data-i18n="mistake_label">Mistake:</span> <span data-i18n="mistake_10">Committing secrets to git</span></li>
+                <li><span class="success" data-i18n="solution_label">Solution:</span> <span data-i18n="solution_10">Use git-secrets pre-commit hook; scan repositories</span></li>
+                
+                <li><span class="danger" data-i18n="mistake_label">Mistake:</span> <span data-i18n="mistake_11">No dependency management</span></li>
+                <li><span class="success" data-i18n="solution_label">Solution:</span> <span data-i18n="solution_11">Lock files committed; automated vulnerability scanning</span></li>
+                
+                <li><span class="danger" data-i18n="mistake_label">Mistake:</span> <span data-i18n="mistake_12">Ignoring error handling</span></li>
+                <li><span class="success" data-i18n="solution_label">Solution:</span> <span data-i18n="solution_12">Structured error responses; no stack traces to client</span></li>
+            </ul>
+        </section>
+
+        <footer>
+            <p data-i18n="footer_title">Hosting & Web Security Guide</p>
+            <p>GitHub: <a href="https://github.com/tworjaga" rel="noopener">tworjaga</a> | Telegram: <a href="https://t.me/al7exy" rel="noopener">@al7exy</a></p>
+            <p style="margin-top: 1rem; font-size: 0.9rem;" data-i18n="last_updated">Last updated: 2024</p>
+        </footer>
+    </div>
+
+    <script src="translations_complete.js"></script>
+</body>
+</html>
