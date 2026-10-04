@@ -1,4 +1,4 @@
-# Secure My Site
+# Secure My Site  [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/tworjaga/SecureMySite)
 
 <div align="center">
   <img src="https://visitor-badge.laobi.icu/badge?page_id=tworjaga.SecureMySite&"  />
