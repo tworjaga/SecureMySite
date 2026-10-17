@@ -1,8 +1,13 @@
 """Application configuration constants for SecureMySite."""
 
 
+APP_VERSION = '2.0.0'
+
+
 class Config:
     """Configuration constants for the application."""
+    
+    APP_VERSION = APP_VERSION
     
     # File size limits
     MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB per file
@@ -18,18 +23,47 @@ class Config:
         '.py': 'python',
         '.js': 'javascript',
         '.jsx': 'javascript',
+        '.mjs': 'javascript',
+        '.cjs': 'javascript',
+        '.vue': 'javascript',
+        '.svelte': 'javascript',
         '.ts': 'typescript',
         '.tsx': 'typescript',
         '.html': 'html',
         '.htm': 'html',
+        '.j2': 'html',
+        '.jinja': 'html',
+        '.jinja2': 'html',
+        '.njk': 'html',
+        '.hbs': 'html',
+        '.handlebars': 'html',
+        '.ejs': 'html',
+        '.mustache': 'html',
         '.json': 'json',
         '.yaml': 'yaml',
         '.yml': 'yaml',
         '.toml': 'toml',
         '.ini': 'ini',
         '.cfg': 'config',
+        '.conf': 'config',
         '.env': 'env',
         '.txt': 'text',
+        '.lock': 'text',
+        '.pem': 'text',
+        '.key': 'text',
+    }
+    
+    # Extension-less (or oddly-suffixed) file names that are always scanned
+    SPECIAL_FILENAMES = {
+        'dockerfile': 'dockerfile',
+        'containerfile': 'dockerfile',
+        'pipfile': 'toml',
+        '.htpasswd': 'text',
+        '.netrc': 'text',
+        'id_rsa': 'text',
+        'id_dsa': 'text',
+        'id_ecdsa': 'text',
+        'id_ed25519': 'text',
     }
     
     # Files and directories to exclude
@@ -47,7 +81,6 @@ class Config:
         '.venv',
         'venv',
         'env',
-        '.env',
         '.tox',
         '.nox',
         
@@ -104,7 +137,6 @@ class Config:
         
         # Documentation
         'docs/_build',
-        'site',
         
         # Database files
         '*.db',
@@ -136,8 +168,11 @@ class Config:
     DEFAULT_SCANNERS = [
         'python_sast',
         'javascript_scanner',
+        'html_scanner',
         'config_scanner',
         'dependency_scanner',
+        'secrets_scanner',
+        'iac_scanner',
     ]
     
     # Web scanner is optional (requires localhost URL)
@@ -193,7 +228,7 @@ class Config:
     }
     
     # Export settings
-    EXPORT_FORMATS = ['json', 'html', 'markdown']
+    EXPORT_FORMATS = ['json', 'html', 'markdown', 'sarif', 'csv']
     DEFAULT_EXPORT_FORMAT = 'json'
     
     # Update settings
@@ -206,16 +241,61 @@ class Config:
         return ext.lower() in cls.SUPPORTED_EXTENSIONS
     
     @classmethod
+    def get_language(cls, filename: str) -> 'str | None':
+        """Resolve the scan language for a file name (handles .env.*, Dockerfile, etc.)."""
+        from pathlib import PurePath
+        
+        name = PurePath(filename).name.lower()
+        if name in cls.SPECIAL_FILENAMES:
+            return cls.SPECIAL_FILENAMES[name]
+        if name == '.env' or name.startswith('.env.'):
+            return 'env'
+        if name.startswith('dockerfile.') or name.endswith('.dockerfile'):
+            return 'dockerfile'
+        return cls.SUPPORTED_EXTENSIONS.get(PurePath(name).suffix)
+    
+    @classmethod
     def should_exclude(cls, path: str) -> bool:
-        """Check if path should be excluded from scanning."""
+        """
+        Check if a project-relative path should be excluded from scanning.
+
+        Patterns are matched against whole path components (and the full
+        relative path for multi-segment patterns like 'docs/_build'), never as
+        substrings - so 'layout.py' is not excluded by the 'out' pattern.
+        """
         import fnmatch
-        
+        from pathlib import PurePath
+
+        normalized = str(path).replace('\\', '/')
+        parts = PurePath(normalized).parts
+        name = parts[-1] if parts else normalized
+
         for pattern in cls.EXCLUDE_PATTERNS:
-            if fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(path, f'*/{pattern}'):
+            if '/' in pattern:
+                if normalized == pattern or normalized.startswith(pattern + '/'):
+                    return True
+                continue
+            if pattern.startswith('*'):
+                # File glob: only applies to the file name
+                if fnmatch.fnmatch(name, pattern):
+                    return True
+                continue
+            # Directory name: any parent component must match exactly
+            if pattern in parts[:-1]:
                 return True
-            if pattern in path:
+
+        return False
+
+    @classmethod
+    def is_excluded_dir_name(cls, dir_name: str) -> bool:
+        """Check if a directory name matches an exclusion pattern."""
+        import fnmatch
+
+        for pattern in cls.EXCLUDE_PATTERNS:
+            if '/' in pattern or pattern.startswith('*'):
+                continue
+            if fnmatch.fnmatch(dir_name, pattern):
                 return True
-        
         return False
     
     @classmethod
