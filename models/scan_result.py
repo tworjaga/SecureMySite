@@ -12,7 +12,7 @@ from .vulnerability import Vulnerability, Severity
 class ScanResult:
     """
     Container for aggregate scan results.
-    
+
     Attributes:
         project_path: Path to scanned project
         vulnerabilities: List of detected vulnerabilities
@@ -31,56 +31,56 @@ class ScanResult:
     scanners_used: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def add_vulnerability(self, vulnerability: Vulnerability) -> None:
         """Add a vulnerability to results."""
         self.vulnerabilities.append(vulnerability)
-    
+
     def add_error(self, error: str) -> None:
         """Add an error message."""
         self.errors.append(error)
-    
+
     def complete_scan(self) -> None:
         """Mark scan as complete."""
         self.scan_end_time = datetime.now()
-    
+
     def get_duration_seconds(self) -> float:
         """Get scan duration in seconds."""
         if not self.scan_end_time:
             return 0.0
         return (self.scan_end_time - self.scan_start_time).total_seconds()
-    
+
     def get_vulnerabilities_by_severity(self, severity: Severity) -> List[Vulnerability]:
         """Get vulnerabilities filtered by severity."""
         return [v for v in self.vulnerabilities if v.severity == severity]
-    
+
     def get_critical_count(self) -> int:
         """Count critical vulnerabilities."""
         return len(self.get_vulnerabilities_by_severity(Severity.CRITICAL))
-    
+
     def get_high_count(self) -> int:
         """Count high severity vulnerabilities."""
         return len(self.get_vulnerabilities_by_severity(Severity.HIGH))
-    
+
     def get_medium_count(self) -> int:
         """Count medium severity vulnerabilities."""
         return len(self.get_vulnerabilities_by_severity(Severity.MEDIUM))
-    
+
     def get_low_count(self) -> int:
         """Count low severity vulnerabilities."""
         return len(self.get_vulnerabilities_by_severity(Severity.LOW))
-    
+
     def get_unique_vulnerabilities(self) -> List[Vulnerability]:
         """Get deduplicated list of vulnerabilities."""
         seen = set()
         unique = []
         for vuln in self.vulnerabilities:
-            key = (str(vuln.file_path), vuln.line_number, vuln.title)
+            key = vuln.dedup_key()
             if key not in seen:
                 seen.add(key)
                 unique.append(vuln)
         return unique
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
         return {
@@ -93,7 +93,7 @@ class ScanResult:
             'errors': self.errors,
             'metadata': self.metadata
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ScanResult':
         """Create ScanResult from dictionary."""
@@ -108,7 +108,7 @@ class ScanResult:
             metadata=data.get('metadata', {})
         )
         return result
-    
+
     def get_summary(self) -> Dict[str, Any]:
         """Get summary statistics."""
         unique = self.get_unique_vulnerabilities()
