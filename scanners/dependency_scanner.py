@@ -2,700 +2,526 @@
 
 import re
 import json
-from typing import List, Optional, Dict, Any
+import logging
+import tomllib
+from dataclasses import dataclass
 from pathlib import Path
+from typing import List, Optional, Dict, Any, Iterable, Tuple
+
+from packaging.requirements import Requirement, InvalidRequirement
+from packaging.specifiers import SpecifierSet, InvalidSpecifier
+from packaging.version import Version, InvalidVersion
 
 from models.vulnerability import Vulnerability, Severity, Category
 from scanners.base_scanner import BaseScanner, ScanContext
 
 
+ASSETS_DIR = Path(__file__).resolve().parent.parent / 'assets'
+DEFAULT_DB_PATH = ASSETS_DIR / 'vuln_db.json'
+LOCAL_DB_PATH = ASSETS_DIR / 'vuln_db.local.json'
+
+OSV_BATCH_URL = 'https://api.osv.dev/v1/querybatch'
+
+logger = logging.getLogger(__name__)
+
+
+def normalize_name(name: str) -> str:
+    """PEP 503 normalisation (also fine for npm names)."""
+    return re.sub(r'[-_.]+', '-', name).lower()
+
+
+@dataclass
+class Dependency:
+    """A dependency declared in a manifest or lockfile."""
+    name: str
+    version: Optional[str]          # exact version if pinned/resolved, else minimum allowed version
+    spec: str                       # original specifier text
+    ecosystem: str                  # 'PyPI' or 'npm'
+    line: int = 1
+    pinned: bool = False
+
+
 class DependencyScanner(BaseScanner):
     """
-    Scanner for dependency files (requirements.txt, package.json, etc.).
-    
-    Checks against local vulnerability database for known vulnerable versions.
+    Scanner for dependency manifests and lockfiles.
+
+    Checks declared/resolved versions against the bundled vulnerability
+    database (assets/vuln_db.json, plus optional assets/vuln_db.local.json)
+    and, when explicitly enabled, the OSV.dev online database.
     """
-    
+
     DEPENDENCY_FILES = {
         'requirements.txt': 'pip',
-        'Pipfile': 'pipenv',
-        'Pipfile.lock': 'pipenv',
-        'poetry.lock': 'poetry',
+        'pyproject.toml': 'pyproject',
+        'pipfile': 'pipfile',
+        'pipfile.lock': 'pipfile-lock',
+        'poetry.lock': 'poetry-lock',
         'setup.py': 'setuptools',
         'package.json': 'npm',
-        'package-lock.json': 'npm',
+        'package-lock.json': 'npm-lock',
+        'npm-shrinkwrap.json': 'npm-lock',
         'yarn.lock': 'yarn',
         'pnpm-lock.yaml': 'pnpm',
     }
-    
+
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         super().__init__(config)
         self.vuln_db = self._load_vulnerability_database()
-    
+        self.online = bool(self.config.get('online', False))
+
+    # ------------------------------------------------------------------ database
+
     def _load_vulnerability_database(self) -> Dict[str, List[Dict]]:
-        """Load local vulnerability database."""
-        default_db = {
-            "vulnerabilities": [
-                {
-                    "package": "django",
-                    "affected_versions": [">=3.0,<3.0.14", ">=3.1,<3.1.8"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-31542",
-                    "description": "Directory traversal via uploaded files"
-                },
-                {
-                    "package": "django",
-                    "affected_versions": [">=2.2,<2.2.24", ">=3.0,<3.0.14", ">=3.1,<3.1.14", ">=3.2,<3.2.4"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2021-35042",
-                    "description": "SQL injection via QuerySet.order_by()"
-                },
-                {
-                    "package": "flask",
-                    "affected_versions": ["<1.0"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2018-1000656",
-                    "description": "Flask before 1.0 has default session cookie secure flag set to False"
-                },
-                {
-                    "package": "requests",
-                    "affected_versions": ["<2.20.0"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2018-18074",
-                    "description": "Requests sends HTTP Authorization headers to redirected domains"
-                },
-                {
-                    "package": "urllib3",
-                    "affected_versions": ["<1.24.2"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2019-11324",
-                    "description": "CRLF injection in urllib3"
-                },
-                {
-                    "package": "jinja2",
-                    "affected_versions": ["<2.10.1"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2019-10906",
-                    "description": "Sandbox escape via string formatting"
-                },
-                {
-                    "package": "sqlalchemy",
-                    "affected_versions": ["<1.3.0"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2019-7164",
-                    "description": "SQL injection via order_by parameter"
-                },
-                {
-                    "package": "pillow",
-                    "affected_versions": ["<8.2.0"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2021-34552",
-                    "description": "Buffer overflow in TIFF decoding"
-                },
-                {
-                    "package": "cryptography",
-                    "affected_versions": ["<3.2"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2020-25659",
-                    "description": "Bleichenbacher timing attack on RSA decryption"
-                },
-                {
-                    "package": "pyyaml",
-                    "affected_versions": ["<5.1"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2017-18342",
-                    "description": "Arbitrary code execution via yaml.load"
-                },
-                {
-                    "package": "numpy",
-                    "affected_versions": ["<1.22.0"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-34141",
-                    "description": "Buffer overflow in array creation"
-                },
-                {
-                    "package": "tornado",
-                    "affected_versions": ["<6.1"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2020-28476",
-                    "description": "Open redirect vulnerability"
-                },
-                {
-                    "package": "celery",
-                    "affected_versions": ["<5.2.0"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-23727",
-                    "description": "Command injection in task execution"
-                },
-                {
-                    "package": "werkzeug",
-                    "affected_versions": ["<2.0.0"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-23942",
-                    "description": "Console debugger RCE vulnerability"
-                },
-                {
-                    "package": "fastapi",
-                    "affected_versions": ["<0.65.2"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-32677",
-                    "description": "Open redirect in OAuth2 authentication"
-                },
-                {
-                    "package": "starlette",
-                    "affected_versions": ["<0.14.2"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-32677",
-                    "description": "Open redirect vulnerability"
-                },
-                {
-                    "package": "aiohttp",
-                    "affected_versions": ["<3.7.4"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-21330",
-                    "description": "Open redirect in HTTP client"
-                },
-                {
-                    "package": "httpx",
-                    "affected_versions": ["<0.23.0"],
-                    "severity": "MEDIUM",
-                    "cve": "CVE-2021-41945",
-                    "description": "Information disclosure in redirects"
-                },
-                {
-                    "package": "lodash",
-                    "affected_versions": ["<4.17.21"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2021-23337",
-                    "description": "Command injection via template"
-                },
-                {
-                    "package": "express",
-                    "affected_versions": ["<4.17.3"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2022-24999",
-                    "description": "qs vulnerable to Prototype Pollution"
-                },
-                {
-                    "package": "axios",
-                    "affected_versions": ["<0.21.1"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-3749",
-                    "description": "Regular expression denial of service"
-                },
-                {
-                    "package": "minimist",
-                    "affected_versions": ["<1.2.6"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2021-44906",
-                    "description": "Prototype pollution via constructor"
-                },
-                {
-                    "package": "jsonwebtoken",
-                    "affected_versions": ["<9.0.0"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2022-23529",
-                    "description": "Token verification bypass"
-                },
-                {
-                    "package": "semver",
-                    "affected_versions": ["<7.5.2"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2022-25883",
-                    "description": "Regular expression denial of service"
-                },
-                {
-                    "package": "word-wrap",
-                    "affected_versions": ["<1.2.4"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2023-26115",
-                    "description": "Regular expression denial of service"
-                },
-                {
-                    "package": "tough-cookie",
-                    "affected_versions": ["<4.1.3"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2023-26136",
-                    "description": "Prototype pollution in cookie parsing"
-                },
-                {
-                    "package": "debug",
-                    "affected_versions": ["<2.6.9", "<3.1.0"],
-                    "severity": "LOW",
-                    "cve": "CVE-2017-16137",
-                    "description": "Regular expression denial of service"
-                },
-                {
-                    "package": "ini",
-                    "affected_versions": ["<1.3.6"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2020-7788",
-                    "description": "Prototype pollution via malicious INI file"
-                },
-                {
-                    "package": "y18n",
-                    "affected_versions": ["<5.0.5"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2020-7774",
-                    "description": "Prototype pollution in y18n"
-                },
-                {
-                    "package": "node-fetch",
-                    "affected_versions": ["<2.6.7", "<3.1.1"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2022-0235",
-                    "description": "Information disclosure via cookie header"
-                },
-                {
-                    "package": "follow-redirects",
-                    "affected_versions": ["<1.14.8"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2022-0536",
-                    "description": "Exposure of sensitive information in URL"
-                },
-                {
-                    "package": "ejs",
-                    "affected_versions": ["<3.1.7"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2022-29078",
-                    "description": "Server-side template injection in ejs"
-                },
-                {
-                    "package": "pac-resolver",
-                    "affected_versions": ["<5.0.0"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2021-23406",
-                    "description": "Remote code execution via PAC file"
-                },
-                {
-                    "package": "shell-quote",
-                    "affected_versions": ["<1.7.3"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2021-42740",
-                    "description": "Command injection via malicious input"
-                },
-                {
-                    "package": "ua-parser-js",
-                    "affected_versions": ["<0.7.30"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2021-27292",
-                    "description": "Regular expression denial of service"
-                },
-                {
-                    "package": "path-parse",
-                    "affected_versions": ["<1.0.7"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-23343",
-                    "description": "Regular expression denial of service"
-                },
-                {
-                    "package": "color-string",
-                    "affected_versions": ["<1.5.5"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-29060",
-                    "description": "Regular expression denial of service"
-                },
-                {
-                    "package": "glob-parent",
-                    "affected_versions": ["<5.1.2"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2020-28469",
-                    "description": "Regular expression denial of service"
-                },
-                {
-                    "package": "normalize-url",
-                    "affected_versions": ["<4.5.1", "<5.3.1", "<6.0.1"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-33502",
-                    "description": "Regular expression denial of service"
-                },
-                {
-                    "package": "trim-newlines",
-                    "affected_versions": ["<3.0.1", "<4.0.1"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-33623",
-                    "description": "Uncontrolled resource consumption"
-                },
-                {
-                    "package": "css-what",
-                    "affected_versions": ["<5.0.1"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-33560",
-                    "description": "Regular expression denial of service"
-                },
-                {
-                    "package": "ws",
-                    "affected_versions": ["<7.4.6", "<6.2.2", "<5.2.3"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-32640",
-                    "description": "Regular expression denial of service in Sec-Websocket-Protocol header"
-                },
-                {
-                    "package": "browserslist",
-                    "affected_versions": ["<4.16.5"],
-                    "severity": "MEDIUM",
-                    "cve": "CVE-2021-23364",
-                    "description": "Regular expression denial of service"
-                },
-                {
-                    "package": "hosted-git-info",
-                    "affected_versions": ["<2.8.9", "<3.0.8"],
-                    "severity": "MEDIUM",
-                    "cve": "CVE-2021-23362",
-                    "description": "Regular expression denial of service"
-                },
-                {
-                    "package": "postcss",
-                    "affected_versions": ["<8.2.13", "<7.0.36"],
-                    "severity": "MEDIUM",
-                    "cve": "CVE-2021-23382",
-                    "description": "Regular expression denial of service"
-                },
-                {
-                    "package": "dns-packet",
-                    "affected_versions": ["<1.3.2", "<5.2.2"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-23386",
-                    "description": "Buffer overflow in DNS packet parsing"
-                },
-                {
-                    "package": "tar",
-                    "affected_versions": ["<6.1.9", "<4.4.19", "<5.0.11"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-37713",
-                    "description": "Arbitrary file creation/overwrite via symlink"
-                },
-                {
-                    "package": "mpath",
-                    "affected_versions": ["<0.8.4"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2021-23438",
-                    "description": "Prototype pollution via mpath"
-                },
-                {
-                    "package": "mongoose",
-                    "affected_versions": ["<5.13.15", "<6.4.6"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2022-42889",
-                    "description": "Prototype pollution in mongoose schema"
-                },
-                {
-                    "package": "bson",
-                    "affected_versions": ["<1.1.4"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2020-7610",
-                    "description": "Deserialization of untrusted data in bson"
-                },
-                {
-                    "package": "underscore",
-                    "affected_versions": ["<1.12.1", "<1.13.0-2"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2021-23358",
-                    "description": "Arbitrary code execution via template"
-                },
-                {
-                    "package": "handlebars",
-                    "affected_versions": ["<4.7.7"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2021-23369",
-                    "description": "Remote code execution via template"
-                },
-                {
-                    "package": "mustache",
-                    "affected_versions": ["<4.1.0"],
-                    "severity": "MEDIUM",
-                    "cve": "CVE-2021-23362",
-                    "description": "Cross-site scripting in mustache"
-                },
-                {
-                    "package": "pug",
-                    "affected_versions": ["<3.0.1"],
-                    "severity": "CRITICAL",
-                    "cve": "CVE-2021-21353",
-                    "description": "Remote code execution via pug template"
-                },
-                {
-                    "package": "jquery",
-                    "affected_versions": ["<3.5.0"],
-                    "severity": "MEDIUM",
-                    "cve": "CVE-2020-11022",
-                    "description": "Cross-site scripting in jQuery"
-                },
-                {
-                    "package": "jquery",
-                    "affected_versions": ["<3.4.0"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2019-11358",
-                    "description": "Prototype pollution in jQuery"
-                },
-                {
-                    "package": "bootstrap",
-                    "affected_versions": ["<4.5.3"],
-                    "severity": "MEDIUM",
-                    "cve": "CVE-2021-23327",
-                    "description": "Cross-site scripting in Bootstrap"
-                },
-                {
-                    "package": "moment",
-                    "affected_versions": ["<2.29.2"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2022-24785",
-                    "description": "Path traversal in moment.js"
-                },
-                {
-                    "package": "validator",
-                    "affected_versions": ["<13.7.0"],
-                    "severity": "HIGH",
-                    "cve": "CVE-2021-23327",
-                    "description": "Regular expression denial of service in validator.js"
-                },
-                {
-                    "package": "ajv",
-                    "affected_versions": ["<8.10.0"],
-                    "severity": "MEDIUM",
-                    "cve": "CVE-2021-23327",
-                    "description": "Prototype pollution in ajv"
-                },
-            ]
+        """Load and index the local vulnerability database(s) by normalized package name."""
+        paths = [DEFAULT_DB_PATH, LOCAL_DB_PATH]
+        if self.config.get('vuln_db_path'):
+            paths.append(Path(self.config['vuln_db_path']))
+
+        indexed: Dict[str, List[Dict]] = {}
+        seen = set()
+        for path in paths:
+            if not path.is_file():
+                if path == DEFAULT_DB_PATH:
+                    logger.warning(f"Vulnerability database not found: {path}")
+                continue
+            try:
+                data = json.loads(path.read_text(encoding='utf-8'))
+            except (OSError, json.JSONDecodeError) as e:
+                logger.error(f"Could not load vulnerability database {path}: {e}")
+                continue
+            for entry in data.get('vulnerabilities', []):
+                pkg = normalize_name(entry.get('package', ''))
+                key = (pkg, entry.get('cve'), tuple(entry.get('affected_versions', [])))
+                if not pkg or key in seen:
+                    continue
+                seen.add(key)
+                indexed.setdefault(pkg, []).append(entry)
+        return indexed
+
+    def get_database_stats(self) -> Dict[str, int]:
+        return {
+            'packages': len(self.vuln_db),
+            'advisories': sum(len(v) for v in self.vuln_db.values()),
         }
-        
-        # Index by package name for faster lookup
-        indexed_db = {}
-        for vuln in default_db['vulnerabilities']:
-            pkg = vuln['package'].lower()
-            if pkg not in indexed_db:
-                indexed_db[pkg] = []
-            indexed_db[pkg].append(vuln)
-        
-        return indexed_db
-    
+
+    # ------------------------------------------------------------------ scanner API
+
     def get_name(self) -> str:
         return "dependency_scanner"
-    
+
     def get_description(self) -> str:
-        return "Dependency vulnerability scanner (requirements.txt, package.json)"
-    
+        return "Dependency vulnerability scanner (requirements, pyproject, Pipfile, package.json, lockfiles)"
+
     def get_supported_languages(self) -> List[str]:
-        return ['text', 'json']
-    
+        return ['text', 'json', 'toml', 'python']
+
+    def _file_type(self, file_path: Path) -> Optional[str]:
+        name = file_path.name.lower()
+        if name in self.DEPENDENCY_FILES:
+            return self.DEPENDENCY_FILES[name]
+        if re.fullmatch(r'requirements[\w.-]*\.(?:txt|in)', name):
+            return 'pip'
+        if file_path.parent.name.lower() == 'requirements' and name.endswith('.txt'):
+            return 'pip'
+        return None
+
     def can_scan_file(self, file_path: Path) -> bool:
         """Check if file is a dependency file."""
-        if not file_path:
-            return False
-        
-        name = file_path.name.lower()
-        return name in self.DEPENDENCY_FILES
-    
+        return bool(file_path) and self._file_type(file_path) is not None
+
     def scan(self, context: ScanContext) -> List[Vulnerability]:
         """Scan dependency file for known vulnerabilities."""
-        vulnerabilities = []
-        
         if not context.file_path or not context.file_content:
-            return vulnerabilities
-        
-        file_name = context.file_path.name.lower()
-        file_type = self.DEPENDENCY_FILES.get(file_name, 'unknown')
-        
-        if file_type == 'pip':
-            vulns = self._scan_requirements_txt(context)
-            vulnerabilities.extend(vulns)
-        elif file_type == 'npm':
-            vulns = self._scan_package_json(context)
-            vulnerabilities.extend(vulns)
-        
-        return vulnerabilities
-    
-    def _scan_requirements_txt(self, context: ScanContext) -> List[Vulnerability]:
-        """Scan requirements.txt for vulnerable packages."""
-        vulnerabilities = []
-        content = context.file_content
-        
-        for line in content.split('\n'):
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            
-            # Parse package name and version
-            match = re.match(r'^([a-zA-Z0-9_-]+)(?:[<>=~!]+)?([0-9.]+)?', line)
-            if match:
-                pkg_name = match.group(1).lower()
-                pkg_version = match.group(2) or '0.0.0'
-                
-                # Check against vulnerability database
-                if pkg_name in self.vuln_db:
-                    for vuln in self.vuln_db[pkg_name]:
-                        if self._version_affected(pkg_version, vuln.get('affected_versions', [])):
-                            vuln_obj = Vulnerability(
-                                title=f"Vulnerable Dependency: {pkg_name}@{pkg_version}",
-                                description=f"{vuln['description']} (CVE: {vuln.get('cve', 'N/A')})",
-                                severity=Severity[vuln['severity']],
-                                category=Category.DEPENDENCY,
-                                file_path=context.file_path,
-                                line_number=self._get_line_number(content, line),
-                                code_snippet=line[:100],
-                                remediation=f"Upgrade {pkg_name} to a non-vulnerable version. Check CVE details for fixed version.",
-                                cwe_id='CWE-1035',
-                                scanner_source=self.get_name(),
-                                metadata={
-                                    'package': pkg_name,
-                                    'version': pkg_version,
-                                    'cve': vuln.get('cve'),
-                                    'affected_versions': vuln.get('affected_versions')
-                                }
-                            )
-                            vulnerabilities.append(vuln_obj)
-        
-        return vulnerabilities
-    
-    def _scan_package_json(self, context: ScanContext) -> List[Vulnerability]:
-        """Scan package.json for vulnerable packages."""
-        vulnerabilities = []
-        
+            return []
+
+        file_type = self._file_type(context.file_path)
+        parsers = {
+            'pip': self._parse_requirements,
+            'pyproject': self._parse_pyproject,
+            'pipfile': self._parse_pipfile,
+            'pipfile-lock': self._parse_pipfile_lock,
+            'poetry-lock': self._parse_poetry_lock,
+            'npm': self._parse_package_json,
+            'npm-lock': self._parse_package_lock,
+        }
+        parser = parsers.get(file_type)
+        if not parser:
+            return []
+
         try:
-            data = json.loads(context.file_content)
-        except json.JSONDecodeError:
-            return vulnerabilities
-        
-        # Check dependencies and devDependencies
-        for dep_type in ['dependencies', 'devDependencies']:
-            deps = data.get(dep_type, {})
-            for pkg_name, version_spec in deps.items():
-                # Clean version string (remove ^, ~, etc.)
-                clean_version = re.sub(r'^[\^~>=<]+', '', version_spec)
-                if not clean_version:
-                    clean_version = '0.0.0'
-                
-                # Check against vulnerability database
-                pkg_lower = pkg_name.lower()
-                if pkg_lower in self.vuln_db:
-                    for vuln in self.vuln_db[pkg_lower]:
-                        if self._version_affected(clean_version, vuln.get('affected_versions', [])):
-                            vuln_obj = Vulnerability(
-                                title=f"Vulnerable Dependency: {pkg_name}@{clean_version}",
-                                description=f"{vuln['description']} (CVE: {vuln.get('cve', 'N/A')})",
-                                severity=Severity[vuln['severity']],
-                                category=Category.DEPENDENCY,
-                                file_path=context.file_path,
-                                line_number=1,
-                                code_snippet=f'"{pkg_name}": "{version_spec}"',
-                                remediation=f"Upgrade {pkg_name} to a non-vulnerable version. Run 'npm audit' for details.",
-                                cwe_id='CWE-1035',
-                                scanner_source=self.get_name(),
-                                metadata={
-                                    'package': pkg_name,
-                                    'version': clean_version,
-                                    'cve': vuln.get('cve'),
-                                    'dependency_type': dep_type,
-                                    'affected_versions': vuln.get('affected_versions')
-                                }
-                            )
-                            vulnerabilities.append(vuln_obj)
-        
-        # Check for missing lockfile
-        has_lockfile = (
-            (context.file_path.parent / 'package-lock.json').exists() or
-            (context.file_path.parent / 'yarn.lock').exists() or
-            (context.file_path.parent / 'pnpm-lock.yaml').exists()
-        )
-        
-        if not has_lockfile:
-            vuln_obj = Vulnerability(
-                title='Missing Lockfile',
-                description='No package-lock.json, yarn.lock, or pnpm-lock.yaml found. Dependencies may not be reproducible.',
-                severity=Severity.LOW,
-                category=Category.DEPENDENCY,
-                file_path=context.file_path,
-                line_number=1,
-                code_snippet='package.json without lockfile',
-                remediation='Run "npm install" to generate package-lock.json, or use "yarn install" / "pnpm install".',
-                cwe_id=None,
-                scanner_source=self.get_name(),
-                metadata={'issue': 'missing_lockfile'}
+            deps = parser(context.file_content)
+        except Exception as e:
+            self.log_error(f"Could not parse {context.file_path}: {e}")
+            return []
+
+        vulnerabilities: List[Vulnerability] = []
+
+        # A lockfile next to package.json is authoritative for versions
+        check_versions = True
+        if file_type == 'npm':
+            lock_exists = any(
+                (context.file_path.parent / lock).exists()
+                for lock in ('package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', 'pnpm-lock.yaml')
             )
-            vulnerabilities.append(vuln_obj)
-        
+            if not lock_exists:
+                vulnerabilities.append(self._missing_lockfile(context))
+            else:
+                check_versions = not (context.file_path.parent / 'package-lock.json').exists()
+
+        if check_versions:
+            for dep in deps:
+                vulnerabilities.extend(self._check_local_db(dep, context))
+            if self.online:
+                vulnerabilities.extend(self._check_osv(deps, context))
+
+        if file_type in ('pip', 'pyproject', 'pipfile'):
+            unpinned = self._unpinned_finding(deps, context)
+            if unpinned:
+                vulnerabilities.append(unpinned)
+
         return vulnerabilities
-    
-    def _version_affected(self, version: str, affected_ranges: List[str]) -> bool:
-        """Check if version is affected by vulnerability."""
-        if not affected_ranges:
-            return False
-        
-        for range_spec in affected_ranges:
-            # Handle wildcard (all versions affected)
-            if range_spec == '*':
-                return True
-            
-            # Simple version comparison for common patterns
-            try:
-                if range_spec.startswith('<'):
-                    # Less than version
-                    compare_ver = range_spec[1:]
-                    if self._compare_versions(version, compare_ver) < 0:
-                        return True
-                elif range_spec.startswith('>='):
-                    # Greater than or equal
-                    compare_ver = range_spec[2:]
-                    if self._compare_versions(version, compare_ver) >= 0:
-                        # Check for upper bound
-                        if ',' in range_spec:
-                            parts = range_spec.split(',')
-                            upper = parts[1].strip()
-                            if upper.startswith('<'):
-                                upper_ver = upper[1:]
-                                if self._compare_versions(version, upper_ver) < 0:
-                                    return True
-                        else:
-                            return True
-                elif range_spec.startswith('>'):
-                    # Greater than
-                    compare_ver = range_spec[1:]
-                    if self._compare_versions(version, compare_ver) > 0:
-                        return True
-                elif range_spec.startswith('<='):
-                    # Less than or equal
-                    compare_ver = range_spec[2:]
-                    if self._compare_versions(version, compare_ver) <= 0:
-                        return True
-                else:
-                    # Exact version match
-                    if version == range_spec:
-                        return True
-            except Exception:
-                # If parsing fails, assume affected for safety
-                return True
-        
-        return False
-    
-    def _compare_versions(self, v1: str, v2: str) -> int:
-        """Compare two version strings. Returns -1, 0, or 1."""
+
+    # ------------------------------------------------------------------ parsers
+
+    @staticmethod
+    def _line_of(content: str, name: str) -> int:
+        pattern = re.compile(r'(?im)^\s*["\']?' + re.escape(name).replace(r'\-', r'[-_.]'))
+        m = pattern.search(content)
+        if not m:
+            m = re.search(re.escape(f'"{name}"'), content)
+        return content.count('\n', 0, m.start()) + 1 if m else 1
+
+    def _from_requirement(self, req_text: str, content: str) -> Optional[Dependency]:
         try:
-            parts1 = [int(x) for x in v1.split('.')[:3]]
-            parts2 = [int(x) for x in v2.split('.')[:3]]
-            
-            # Pad with zeros
-            while len(parts1) < 3:
-                parts1.append(0)
-            while len(parts2) < 3:
-                parts2.append(0)
-            
-            for i in range(3):
-                if parts1[i] < parts2[i]:
-                    return -1
-                elif parts1[i] > parts2[i]:
-                    return 1
-            return 0
-        except (ValueError, IndexError):
-            # Fallback to string comparison
-            if v1 < v2:
-                return -1
-            elif v1 > v2:
-                return 1
-            return 0
-    
-    def _get_line_number(self, content: str, target_line: str) -> int:
-        """Get line number for a specific line in content."""
-        for i, line in enumerate(content.split('\n'), 1):
-            if line.strip() == target_line.strip():
-                return i
-        return 1
+            req = Requirement(req_text)
+        except InvalidRequirement:
+            return None
+        if req.url:
+            return None
+        return self._from_spec(req.name, req.specifier, str(req.specifier), 'PyPI', content)
+
+    def _from_spec(self, name: str, spec: SpecifierSet, spec_text: str, ecosystem: str, content: str) -> Dependency:
+        pinned_version = None
+        minimum = None
+        for s in spec:
+            if s.operator in ('==', '===') and '*' not in s.version:
+                pinned_version = s.version
+            elif s.operator in ('>=', '~=', '>'):
+                minimum = s.version
+        return Dependency(
+            name=name,
+            version=pinned_version or minimum,
+            spec=spec_text or '*',
+            ecosystem=ecosystem,
+            line=self._line_of(content, name),
+            pinned=pinned_version is not None,
+        )
+
+    def _parse_requirements(self, content: str) -> List[Dependency]:
+        deps = []
+        for raw in content.splitlines():
+            line = raw.split(' #', 1)[0].strip()
+            if not line or line.startswith(('#', '-', 'git+', 'http://', 'https://')):
+                continue
+            line = line.split(';', 1)[0].strip() if ' --hash' in line else line
+            line = line.split(' --hash', 1)[0].strip()
+            dep = self._from_requirement(line, content)
+            if dep:
+                deps.append(dep)
+        return deps
+
+    def _parse_pyproject(self, content: str) -> List[Dependency]:
+        data = tomllib.loads(content)
+        deps: List[Dependency] = []
+        project = data.get('project', {})
+        req_lists = [project.get('dependencies', [])]
+        req_lists.extend(project.get('optional-dependencies', {}).values())
+        for reqs in req_lists:
+            for req_text in reqs:
+                dep = self._from_requirement(req_text, content)
+                if dep:
+                    deps.append(dep)
+
+        poetry = data.get('tool', {}).get('poetry', {})
+        poetry_sections = [poetry.get('dependencies', {}), poetry.get('dev-dependencies', {})]
+        for group in poetry.get('group', {}).values():
+            poetry_sections.append(group.get('dependencies', {}))
+        for section in poetry_sections:
+            for name, spec in section.items():
+                if name.lower() == 'python':
+                    continue
+                version = spec.get('version') if isinstance(spec, dict) else spec
+                if isinstance(version, str):
+                    deps.append(self._poetry_dep(name, version, content))
+        return deps
+
+    def _poetry_dep(self, name: str, version: str, content: str) -> Dependency:
+        """Translate poetry/npm style constraints (^1.2, ~1.2, 1.2.3, *) to a Dependency."""
+        version = version.strip()
+        if version in ('*', '', 'latest'):
+            return Dependency(name, None, version or '*', 'PyPI', self._line_of(content, name))
+        m = re.match(r'^[\^~>=]*\s*v?(\d+(?:\.\d+)*(?:[-.]?\w+)?)', version)
+        exact = bool(re.fullmatch(r'=?=?\s*v?\d+(?:\.\d+)*', version))
+        return Dependency(
+            name, m.group(1) if m else None, version, 'PyPI', self._line_of(content, name), pinned=exact
+        )
+
+    def _parse_pipfile(self, content: str) -> List[Dependency]:
+        data = tomllib.loads(content)
+        deps = []
+        for section in ('packages', 'dev-packages'):
+            for name, spec in data.get(section, {}).items():
+                version = spec.get('version', '*') if isinstance(spec, dict) else spec
+                if not isinstance(version, str):
+                    continue
+                if version.strip() == '*':
+                    deps.append(Dependency(name, None, '*', 'PyPI', self._line_of(content, name)))
+                    continue
+                try:
+                    spec_set = SpecifierSet(version)
+                except InvalidSpecifier:
+                    continue
+                deps.append(self._from_spec(name, spec_set, version, 'PyPI', content))
+        return deps
+
+    def _parse_pipfile_lock(self, content: str) -> List[Dependency]:
+        data = json.loads(content)
+        deps = []
+        for section in ('default', 'develop'):
+            for name, info in data.get(section, {}).items():
+                version = str(info.get('version', '')).lstrip('=')
+                if version:
+                    deps.append(Dependency(name, version, info.get('version', ''), 'PyPI',
+                                           self._line_of(content, name), pinned=True))
+        return deps
+
+    def _parse_poetry_lock(self, content: str) -> List[Dependency]:
+        data = tomllib.loads(content)
+        return [
+            Dependency(p['name'], p.get('version'), p.get('version', ''), 'PyPI',
+                       self._line_of(content, p['name']), pinned=True)
+            for p in data.get('package', []) if p.get('name')
+        ]
+
+    def _parse_package_json(self, content: str) -> List[Dependency]:
+        data = json.loads(content)
+        deps = []
+        for dep_type in ('dependencies', 'devDependencies', 'optionalDependencies'):
+            for name, spec in (data.get(dep_type) or {}).items():
+                if not isinstance(spec, str):
+                    continue
+                spec = spec.strip()
+                line = self._line_of(content, name)
+                if spec.startswith(('file:', 'link:', 'git', 'http', 'workspace:', 'npm:')) or '/' in spec:
+                    continue
+                m = re.search(r'(\d+(?:\.\d+){0,2})', spec)
+                exact = bool(re.fullmatch(r'=?v?\d+\.\d+\.\d+', spec))
+                deps.append(Dependency(name, m.group(1) if m else None, spec, 'npm', line, pinned=exact))
+        return deps
+
+    def _parse_package_lock(self, content: str) -> List[Dependency]:
+        data = json.loads(content)
+        deps: Dict[Tuple[str, str], Dependency] = {}
+        packages = data.get('packages')
+        if isinstance(packages, dict):  # lockfileVersion 2/3
+            for path, info in packages.items():
+                if not path or 'node_modules/' not in path:
+                    continue
+                name = info.get('name') or path.rsplit('node_modules/', 1)[-1]
+                version = info.get('version')
+                if version:
+                    deps[(name, version)] = Dependency(name, version, version, 'npm', 1, pinned=True)
+        else:  # lockfileVersion 1
+            def walk(tree: Dict[str, Any]) -> None:
+                for name, info in (tree or {}).items():
+                    version = info.get('version')
+                    if version:
+                        deps[(name, version)] = Dependency(name, version, version, 'npm', 1, pinned=True)
+                    walk(info.get('dependencies'))
+            walk(data.get('dependencies'))
+        for dep in deps.values():
+            dep.line = self._line_of(content, dep.name)
+        return list(deps.values())
+
+    # ------------------------------------------------------------------ matching
+
+    @staticmethod
+    def _parse_version(version: Optional[str]) -> Optional[Version]:
+        if not version:
+            return None
+        try:
+            return Version(version)
+        except InvalidVersion:
+            m = re.match(r'v?(\d+(?:\.\d+){0,2})', version)
+            try:
+                return Version(m.group(1)) if m else None
+            except InvalidVersion:
+                return None
+
+    def _version_affected(self, version: str, affected_ranges: List[str]) -> bool:
+        """Check if version falls in any of the affected ranges."""
+        return self._matching_range(version, affected_ranges) is not None
+
+    def _matching_range(self, version: str, affected_ranges: List[str]) -> Optional[str]:
+        parsed = self._parse_version(version)
+        if parsed is None:
+            return None
+        for range_spec in affected_ranges:
+            range_spec = range_spec.strip()
+            if range_spec == '*':
+                return range_spec
+            try:
+                spec = SpecifierSet(range_spec.replace(' ', ''))
+            except InvalidSpecifier:
+                if range_spec.lstrip('=') == version:
+                    return range_spec
+                continue
+            if spec.contains(parsed, prereleases=True):
+                return range_spec
+        return None
+
+    @staticmethod
+    def _fixed_version(range_spec: str) -> Optional[str]:
+        m = re.search(r'<\s*([0-9][\w.\-]*)', range_spec)
+        return m.group(1) if m else None
+
+    def _check_local_db(self, dep: Dependency, context: ScanContext) -> List[Vulnerability]:
+        findings = []
+        if not dep.version:
+            return findings
+        seen_cves = set()
+        for entry in self.vuln_db.get(normalize_name(dep.name), []):
+            matched = self._matching_range(dep.version, entry.get('affected_versions', []))
+            if not matched:
+                continue
+            cve = entry.get('cve', 'N/A')
+            if cve in seen_cves:
+                continue
+            seen_cves.add(cve)
+
+            severity = Severity[entry.get('severity', 'MEDIUM').upper()]
+            fixed = self._fixed_version(matched)
+            qualifier = '' if dep.pinned else ' (minimum version allowed by your constraint)'
+            if not dep.pinned and severity != Severity.LOW:
+                # A range might resolve to a fixed version - report one level lower
+                severity = Severity(severity.value + 1)
+
+            findings.append(self._dependency_finding(
+                context, dep, severity,
+                title=f"Vulnerable Dependency: {dep.name}@{dep.version}",
+                description=f"{entry.get('description', 'Known vulnerability')} ({cve}). "
+                            f"Affected range: {matched}{qualifier}.",
+                fixed=fixed, advisory_id=cve, source='local-db',
+            ))
+        return findings
+
+    def _dependency_finding(
+        self, context: ScanContext, dep: Dependency, severity: Severity, title: str,
+        description: str, fixed: Optional[str], advisory_id: str, source: str,
+    ) -> Vulnerability:
+        if fixed:
+            remediation = f"Upgrade {dep.name} to {fixed} or later"
+        else:
+            remediation = f"Upgrade {dep.name} to a patched release"
+        remediation += " (npm audit fix / npm install <pkg>@latest)." if dep.ecosystem == 'npm' else \
+            " (pip install -U <pkg>) and re-pin the version."
+        line_text = context.file_content.splitlines()[dep.line - 1] if dep.line else ''
+        return Vulnerability(
+            title=title,
+            description=description,
+            severity=severity,
+            category=Category.DEPENDENCY,
+            file_path=context.file_path,
+            line_number=dep.line,
+            code_snippet=line_text.strip()[:120] or f'{dep.name} {dep.spec}',
+            remediation=remediation,
+            cwe_id='CWE-1395',
+            scanner_source=self.get_name(),
+            metadata={
+                'package': dep.name,
+                'version': dep.version,
+                'spec': dep.spec,
+                'ecosystem': dep.ecosystem,
+                'cve': advisory_id,
+                'fixed_version': fixed,
+                'source': source,
+            }
+        )
+
+    # ------------------------------------------------------------------ OSV (opt-in)
+
+    def _check_osv(self, deps: Iterable[Dependency], context: ScanContext) -> List[Vulnerability]:
+        """Query OSV.dev for exact versions. Only runs when online mode is enabled."""
+        exact = [d for d in deps if d.version and d.pinned]
+        if not exact:
+            return []
+        try:
+            import requests
+        except ImportError:
+            return []
+
+        queries = [
+            {'package': {'name': d.name, 'ecosystem': d.ecosystem}, 'version': d.version}
+            for d in exact
+        ]
+        findings: List[Vulnerability] = []
+        try:
+            for start in range(0, len(queries), 500):
+                response = requests.post(OSV_BATCH_URL, json={'queries': queries[start:start + 500]}, timeout=20)
+                response.raise_for_status()
+                for dep, result in zip(exact[start:start + 500], response.json().get('results', [])):
+                    ids = sorted(v.get('id', 'OSV') for v in (result.get('vulns') or []))
+                    if not ids:
+                        continue
+                    # One finding per package: a single old release can have dozens of advisories
+                    shown = ', '.join(ids[:10]) + (f' and {len(ids) - 10} more' if len(ids) > 10 else '')
+                    finding = self._dependency_finding(
+                        context, dep, Severity.HIGH,
+                        title=f"Known Vulnerabilities (OSV.dev): {dep.name}@{dep.version}",
+                        description=f"OSV.dev lists {len(ids)} advisor{'y' if len(ids) == 1 else 'ies'} "
+                                    f"for this version: {shown}. Details: https://osv.dev/vulnerability/{ids[0]}",
+                        fixed=None, advisory_id=f"osv:{dep.name}", source='osv.dev',
+                    )
+                    finding.metadata['advisories'] = ids
+                    findings.append(finding)
+        except Exception as e:
+            self.log_error(f"OSV lookup failed: {e}")
+        return findings
+
+    # ------------------------------------------------------------------ hygiene findings
+
+    def _unpinned_finding(self, deps: List[Dependency], context: ScanContext) -> Optional[Vulnerability]:
+        unpinned = [d for d in deps if not d.pinned]
+        if not unpinned or context.file_path.name.lower() == 'pyproject.toml':
+            # Libraries legitimately use ranges in pyproject.toml
+            return None
+        names = ', '.join(d.name for d in unpinned[:8]) + (' ...' if len(unpinned) > 8 else '')
+        return Vulnerability(
+            title='Unpinned Dependencies',
+            description=f'{len(unpinned)} dependencies are not pinned to an exact version ({names}). '
+                        'Builds are not reproducible and may silently pick up vulnerable or malicious releases.',
+            severity=Severity.LOW,
+            category=Category.DEPENDENCY,
+            file_path=context.file_path,
+            line_number=unpinned[0].line,
+            code_snippet='\n'.join(f'{d.name} {d.spec}'.strip() for d in unpinned[:5]),
+            remediation='Pin exact versions (pip-compile / pip freeze / poetry lock) and update them deliberately.',
+            cwe_id='CWE-1357',
+            scanner_source=self.get_name(),
+            metadata={'issue': 'unpinned', 'packages': [d.name for d in unpinned]}
+        )
+
+    def _missing_lockfile(self, context: ScanContext) -> Vulnerability:
+        return Vulnerability(
+            title='Missing Lockfile',
+            description='No package-lock.json, yarn.lock, or pnpm-lock.yaml found. Dependencies may not be reproducible.',
+            severity=Severity.LOW,
+            category=Category.DEPENDENCY,
+            file_path=context.file_path,
+            line_number=1,
+            code_snippet='package.json without lockfile',
+            remediation='Run "npm install" to generate package-lock.json and commit it.',
+            cwe_id='CWE-1357',
+            scanner_source=self.get_name(),
+            metadata={'issue': 'missing_lockfile'}
+        )
