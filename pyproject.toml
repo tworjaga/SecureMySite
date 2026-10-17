@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "securemysite"
-version = "1.0.0"
+version = "2.0.0"
 description = "Local security analyzer for AI-generated web projects"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Security",
     "Topic :: Software Development :: Quality Assurance",
 ]
@@ -34,6 +35,7 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-qt>=4.0.0",
+    "pyflakes>=3.0.0",
     "black>=22.0.0",
     "flake8>=4.0.0",
     "mypy>=0.950",
@@ -48,7 +50,9 @@ Repository = "https://github.com/tworjaga/SecureMySite.git"
 Issues = "https://github.com/tworjaga/SecureMySite/issues"
 
 [tool.setuptools]
+py-modules = ["main", "app"]
 packages = [
+    "assets",
     "models",
     "scoring",
     "scanners",
@@ -59,7 +63,7 @@ packages = [
 ]
 
 [tool.setuptools.package-data]
-scanners = ["vuln_db.json"]
+assets = ["*.json"]
 
 [tool.black]
 line-length = 100
