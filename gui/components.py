@@ -1,683 +1,553 @@
-"""Modern reusable UI components for SecureMySite GUI."""
+"""Reusable UI components for the SecureMySite GUI."""
 
-from typing import Optional, List, Callable
-from pathlib import Path
+import html
+from typing import Dict, List, Optional, Sequence, Tuple
 
+from PyQt6.QtCore import QEasingCurve, QRectF, QSize, Qt, QVariantAnimation, pyqtSignal
+from PyQt6.QtGui import QBrush, QColor, QFont, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QListWidget, QListWidgetItem, QTextEdit, QFrame,
-    QSizePolicy, QProgressBar, QGridLayout, QGraphicsDropShadowEffect
+    QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton,
+    QTableWidget, QTableWidgetItem, QTextBrowser, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer, QPropertyAnimation, QEasingCurve, QRectF, pyqtProperty
-from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QBrush, QConicalGradient
 
-from models.vulnerability import Vulnerability, Severity
-
+from core.insights import owasp_label
 from gui.theme import Theme
+from models.vulnerability import Severity, Vulnerability
 
 
-class AnimatedScoreWidget(QWidget):
-    """Modern animated circular score display with gradient ring."""
-    
+def location_for(vulnerability: Vulnerability) -> str:
+    """Project-relative location for display (falls back to absolute path / URL)."""
+    rel = vulnerability.metadata.get('relative_path')
+    if rel:
+        return f"{rel}:{vulnerability.line_number}" if vulnerability.line_number else rel
+    if vulnerability.file_path:
+        return vulnerability.get_location_string()
+    return vulnerability.metadata.get('url') or 'Web application'
+
+
+_DOT_CACHE: Dict[str, QIcon] = {}
+
+
+def severity_icon(severity_name: str) -> QIcon:
+    """Small colored dot used in tables."""
+    if severity_name not in _DOT_CACHE:
+        pix = QPixmap(12, 12)
+        pix.fill(Qt.GlobalColor.transparent)
+        p = QPainter(pix)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(Theme.get_severity_color(severity_name)))
+        p.drawEllipse(1, 1, 10, 10)
+        p.end()
+        _DOT_CACHE[severity_name] = QIcon(pix)
+    return _DOT_CACHE[severity_name]
+
+
+def section_label(text: str) -> QLabel:
+    label = QLabel(text.upper())
+    label.setObjectName("sectionLabel")
+    return label
+
+
+def card(title: Optional[str] = None) -> Tuple[QFrame, QVBoxLayout]:
+    """A rounded surface with an optional title; returns (frame, content layout)."""
+    frame = QFrame()
+    frame.setObjectName("card")
+    layout = QVBoxLayout(frame)
+    layout.setContentsMargins(16, 14, 16, 14)
+    layout.setSpacing(10)
+    if title:
+        heading = QLabel(title)
+        heading.setObjectName("cardTitle")
+        layout.addWidget(heading)
+    return frame, layout
+
+
+# --------------------------------------------------------------------------- score
+
+class ScoreRing(QWidget):
+    """Animated circular security score."""
+
     score_changed = pyqtSignal(int)
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._score = 0
-        self._target_score = 0
-        self._risk_level = "No Scan"
+        self._score = 0.0
+        self._target = 0
         self._grade = "-"
-        self._animation = QPropertyAnimation(self, b"animated_score")
-        self._animation.setDuration(1500)
-        self._animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self.setMinimumSize(220, 220)
-        self.setMaximumSize(280, 280)
-    
-    def get_animated_score(self):
-        return self._score
-    
-    def set_animated_score(self, value):
-        self._score = value
-        self.update()
-    
-    animated_score = pyqtProperty(int, get_animated_score, set_animated_score)
+        self._risk = "Not scanned"
+        self._has_result = False
+        self._anim = QVariantAnimation(self)
+        self._anim.setDuration(1200)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._anim.valueChanged.connect(self._on_anim)
+        self.setFixedSize(168, 168)
 
-    
+    def _on_anim(self, value):
+        self._score = float(value)
+        self.update()
+
     def set_score(self, score: int, risk_level: str, grade: str):
-        """Animate to new score."""
-        self._target_score = max(0, min(100, score))
-        self._risk_level = risk_level
-        self._grade = grade
-        
-        self._animation.stop()
-        self._animation.setStartValue(self._score)
-        self._animation.setEndValue(self._target_score)
-        self._animation.start()
-        self.score_changed.emit(score)
-    
+        self._target = max(0, min(100, int(score)))
+        self._grade, self._risk, self._has_result = grade, risk_level, True
+        self._anim.stop()
+        self._anim.setStartValue(float(self._score))
+        self._anim.setEndValue(float(self._target))
+        self._anim.start()
+        self.score_changed.emit(self._target)
+
     def reset(self):
-        """Reset to default state."""
-        self._animation.stop()
-        self._score = 0
-        self._target_score = 0
-        self._risk_level = "No Scan"
-        self._grade = "-"
+        self._anim.stop()
+        self._score, self._target, self._grade, self._risk, self._has_result = 0.0, 0, "-", "Not scanned", False
         self.update()
-    
+
     def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        center = self.rect().center()
-        outer_radius = min(self.width(), self.height()) // 2 - 20
-        inner_radius = outer_radius - 15
-        
-        # Background ring
-        bg_pen = QPen(QColor(Theme.SURFACE_LIGHT))
-        bg_pen.setWidth(12)
-        bg_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(bg_pen)
-        painter.drawEllipse(center, outer_radius - 6, outer_radius - 6)
-        
-        # Progress ring with gradient
-        if self._score > 0:
-            color = QColor(Theme.get_score_color(self._score))
-            gradient = QConicalGradient(center, 90)
-            gradient.setColorAt(0, color.darker(120))
-            gradient.setColorAt(0.5, color)
-            gradient.setColorAt(1, color.lighter(120))
-            
-            progress_pen = QPen(QBrush(gradient), 12)
-            progress_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-            painter.setPen(progress_pen)
-            
-            span_angle = int(-self._score * 3.6 * 16)
-            painter.drawArc(
-                QRectF(center.x() - outer_radius + 6, center.y() - outer_radius + 6,
-                       (outer_radius - 6) * 2, (outer_radius - 6) * 2),
-                90 * 16, span_angle
-            )
-        
-        # Score text
-        painter.setPen(QColor(Theme.TEXT_PRIMARY))
-        font = QFont(Theme.FONT_FAMILY.split(',')[0].strip('"'))
-        font.setPointSize(36)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = QRectF(self.rect()).adjusted(10, 10, -10, -10)
+
+        track = QPen(QColor(Theme.SURFACE_LIGHTER), 10)
+        track.setCapStyle(Qt.PenCapStyle.RoundCap)
+        p.setPen(track)
+        p.drawArc(rect, 0, 360 * 16)
+
+        color = QColor(Theme.get_score_color(int(self._score)) if self._has_result else Theme.TEXT_DISABLED)
+        if self._has_result:
+            arc = QPen(color, 10)
+            arc.setCapStyle(Qt.PenCapStyle.RoundCap)
+            p.setPen(arc)
+            span = max(2.0, self._score) * 3.6
+            p.drawArc(rect, 90 * 16, int(-span * 16))
+
+        p.setPen(QColor(Theme.TEXT_PRIMARY if self._has_result else Theme.TEXT_DISABLED))
+        font = QFont(self.font())
+        font.setPixelSize(40)
         font.setBold(True)
-        painter.setFont(font)
-        score_text = str(self._score)
-        metrics = painter.fontMetrics()
-        text_rect = metrics.boundingRect(score_text)
-        painter.drawText(
-            center.x() - text_rect.width() // 2,
-            center.y() - 10,
-            score_text
-        )
-        
-        # Grade text
-        font.setPointSize(14)
-        painter.setFont(font)
-        painter.setPen(QColor(Theme.get_score_color(self._score) if self._score > 0 else Theme.TEXT_SECONDARY))
-        grade_metrics = painter.fontMetrics()
-        grade_rect = grade_metrics.boundingRect(self._grade)
-        painter.drawText(
-            center.x() - grade_rect.width() // 2,
-            center.y() + 25,
-            self._grade
-        )
-        
-        # Risk level
-        font.setPointSize(10)
-        painter.setFont(font)
-        painter.setPen(QColor(Theme.TEXT_SECONDARY))
-        risk_metrics = painter.fontMetrics()
-        risk_rect = risk_metrics.boundingRect(self._risk_level)
-        painter.drawText(
-            center.x() - risk_rect.width() // 2,
-            center.y() + 50,
-            self._risk_level
-        )
-        
-        painter.end()
+        p.setFont(font)
+        number = str(int(round(self._score))) if self._has_result else "--"
+        p.drawText(QRectF(rect.x(), rect.y() + 30, rect.width(), 50), Qt.AlignmentFlag.AlignCenter, number)
+
+        font.setPixelSize(13)
+        font.setBold(True)
+        p.setFont(font)
+        p.setPen(color)
+        p.drawText(QRectF(rect.x(), rect.y() + 82, rect.width(), 20), Qt.AlignmentFlag.AlignCenter,
+                   f"Grade {self._grade}" if self._has_result else "")
+        font.setBold(False)
+        font.setPixelSize(11)
+        p.setFont(font)
+        p.setPen(QColor(Theme.TEXT_TERTIARY))
+        p.drawText(QRectF(rect.x(), rect.y() + 102, rect.width(), 18), Qt.AlignmentFlag.AlignCenter, self._risk)
+        p.end()
 
 
-class ScoreDisplay(AnimatedScoreWidget):
-    """Backward-compatible alias for AnimatedScoreWidget."""
-    pass
+# Backwards-compatible names
+AnimatedScoreWidget = ScoreRing
+ScoreDisplay = ScoreRing
+
+
+class _MiniBar(QWidget):
+    def __init__(self, color: str, parent=None):
+        super().__init__(parent)
+        self.color = QColor(color)
+        self.fraction = 0.0
+        self.setFixedHeight(6)
+
+    def set_fraction(self, fraction: float):
+        self.fraction = max(0.0, min(1.0, fraction))
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(Theme.SURFACE_LIGHTER))
+        p.drawRoundedRect(QRectF(self.rect()), 3, 3)
+        if self.fraction > 0:
+            p.setBrush(self.color)
+            w = max(6.0, self.width() * self.fraction)
+            p.drawRoundedRect(QRectF(0, 0, w, self.height()), 3, 3)
+        p.end()
 
 
 class SeverityBadge(QWidget):
-    """Modern severity badge with icon and count."""
-    
+    """Severity row: colored name, proportional bar and count."""
+
     def __init__(self, severity: Severity, count: int = 0, parent=None):
         super().__init__(parent)
         self.severity = severity
         self.count = count
-        self._setup_ui()
-    
-    def _setup_ui(self):
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(12)
-        
-        color = Theme.get_severity_color(self.severity.name)
-        
-        # Icon indicator with glow effect
-        self.indicator = QFrame()
-        self.indicator.setFixedSize(10, 10)
-        self.indicator.setStyleSheet(f"""
-            QFrame {{
-                background-color: {color};
-                border-radius: 5px;
-                border: none;
-            }}
-        """)
-        
-        # Severity name
-        self.name_label = QLabel(self.severity.name)
-        self.name_label.setStyleSheet(f"""
-            color: {color};
-            font-weight: 600;
-            font-size: 12px;
-        """)
-        
-        # Count with background
-        self.count_label = QLabel(str(self.count))
-        self.count_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.count_label.setStyleSheet(f"""
-            QLabel {{
-                background-color: {Theme.SURFACE_LIGHT};
-                color: {Theme.TEXT_PRIMARY};
-                border-radius: 10px;
-                padding: 4px 12px;
-                font-weight: 700;
-                font-size: 13px;
-                min-width: 30px;
-            }}
-        """)
-        
-        layout.addWidget(self.indicator)
-        layout.addWidget(self.name_label)
-        layout.addStretch()
-        layout.addWidget(self.count_label)
-        
-        self.setStyleSheet(f"""
-            SeverityBadge {{
-                background-color: {Theme.SURFACE};
-                border-radius: {Theme.BORDER_RADIUS_NORMAL};
-                border: 1px solid {Theme.BORDER};
-            }}
-            SeverityBadge:hover {{
-                background-color: {Theme.SURFACE_LIGHT};
-                border-color: {color};
-            }}
-        """)
-    
-    def set_count(self, count: int):
-        """Update count display."""
+        color = Theme.get_severity_color(severity.name)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setSpacing(4)
+
+        top = QHBoxLayout()
+        top.setSpacing(8)
+        self.name_label = QLabel(severity.name.title())
+        self.name_label.setStyleSheet(f"color: {color}; font-weight: 600; font-size: 12px;")
+        self.count_label = QLabel(str(count))
+        self.count_label.setStyleSheet(f"color: {Theme.TEXT_PRIMARY}; font-weight: 700; font-size: 12px;")
+        self.count_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        top.addWidget(self.name_label)
+        top.addStretch()
+        top.addWidget(self.count_label)
+
+        self.bar = _MiniBar(color)
+        layout.addLayout(top)
+        layout.addWidget(self.bar)
+
+    def set_count(self, count: int, total: int = 0):
         self.count = count
         self.count_label.setText(str(count))
+        self.bar.set_fraction(count / total if total else 0.0)
 
 
-class VulnerabilityItem(QWidget):
-    """Modern vulnerability list item with enhanced styling."""
-    
-    clicked = pyqtSignal(object)
-    
-    def __init__(self, vulnerability: Vulnerability, parent=None):
+# --------------------------------------------------------------------------- stat card
+
+class StatCard(QFrame):
+    """KPI tile: title, big value, small hint."""
+
+    def __init__(self, title: str, hint: str = "", parent=None):
         super().__init__(parent)
-        self.vulnerability = vulnerability
-        self._setup_ui()
-    
-    def _setup_ui(self):
+        self.setObjectName("card")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(10)
-        
-        severity_color = Theme.get_severity_color(self.vulnerability.severity.name)
-        
-        # Header with severity and title
-        header = QHBoxLayout()
-        header.setSpacing(12)
-        
-        # Severity badge (modern pill style)
-        self.severity_label = QLabel(self.vulnerability.severity.name)
-        self.severity_label.setStyleSheet(f"""
-            QLabel {{
-                color: {severity_color};
-                font-weight: 700;
-                font-size: {Theme.FONT_SIZE_XSMALL};
-                padding: 4px 10px;
-                background-color: {severity_color}20;
-                border-radius: {Theme.BORDER_RADIUS_FULL};
-                border: 1px solid {severity_color}40;
-            }}
-        """)
-        self.severity_label.setFixedHeight(24)
-        
-        # Title with better typography
-        self.title_label = QLabel(self.vulnerability.title)
-        self.title_label.setStyleSheet(f"""
-            color: {Theme.TEXT_PRIMARY};
-            font-weight: 600;
-            font-size: {Theme.FONT_SIZE_NORMAL};
-        """)
-        self.title_label.setWordWrap(True)
-        
-        header.addWidget(self.severity_label)
-        header.addWidget(self.title_label, 1)
-        
-        # Location with icon-style prefix
-        location_text = self.vulnerability.get_location_string()
-        self.location_label = QLabel(f"  {location_text}")
-        self.location_label.setStyleSheet(f"""
-            color: {Theme.TEXT_TERTIARY};
-            font-size: {Theme.FONT_SIZE_SMALL};
-            font-family: {Theme.FONT_MONO};
-        """)
-        
-        # Description with better readability
-        self.desc_label = QLabel(self.vulnerability.description)
-        self.desc_label.setStyleSheet(f"""
-            color: {Theme.TEXT_SECONDARY};
-            font-size: {Theme.FONT_SIZE_SMALL};
-            line-height: 1.5;
-        """)
-        self.desc_label.setWordWrap(True)
-        self.desc_label.setMaximumHeight(50)
-        
-        layout.addLayout(header)
-        layout.addWidget(self.location_label)
-        layout.addWidget(self.desc_label)
-        
-        # Modern card styling with left accent
-        self.setStyleSheet(f"""
-            VulnerabilityItem {{
-                background-color: {Theme.SURFACE};
-                border: 1px solid {Theme.BORDER};
-                border-left: 4px solid {severity_color};
-                border-radius: {Theme.BORDER_RADIUS_NORMAL};
-            }}
-            VulnerabilityItem:hover {{
-                background-color: {Theme.SURFACE_LIGHT};
-                border-color: {Theme.BORDER_LIGHT};
-                border-left-color: {severity_color};
-            }}
-        """)
-        
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        
-        # Add subtle shadow
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(8)
-        shadow.setColor(QColor(0, 0, 0, 30))
-        shadow.setOffset(0, 2)
-        self.setGraphicsEffect(shadow)
-    
-    def enterEvent(self, event):
-        """Hover enter effect."""
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(16)
-        shadow.setColor(QColor(0, 0, 0, 50))
-        shadow.setOffset(0, 4)
-        self.setGraphicsEffect(shadow)
-        super().enterEvent(event)
-    
-    def leaveEvent(self, event):
-        """Hover leave effect."""
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(8)
-        shadow.setColor(QColor(0, 0, 0, 30))
-        shadow.setOffset(0, 2)
-        self.setGraphicsEffect(shadow)
-        super().leaveEvent(event)
-    
-    def mousePressEvent(self, event):
-        """Handle click."""
-        self.clicked.emit(self.vulnerability)
-        super().mousePressEvent(event)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(2)
+        self.title_label = QLabel(title)
+        self.title_label.setObjectName("cardTitle")
+        self.value_label = QLabel("--")
+        self.value_label.setStyleSheet(f"font-size: 24px; font-weight: 700; color: {Theme.TEXT_PRIMARY};")
+        self.hint_label = QLabel(hint)
+        self.hint_label.setObjectName("muted")
+        layout.addWidget(self.title_label)
+        layout.addWidget(self.value_label)
+        layout.addWidget(self.hint_label)
+
+    def set_title(self, title: str):
+        self.title_label.setText(title)
+
+    def set_value(self, value, hint: Optional[str] = None, color: Optional[str] = None):
+        self.value_label.setText(str(value))
+        self.value_label.setStyleSheet(
+            f"font-size: 24px; font-weight: 700; color: {color or Theme.TEXT_PRIMARY};")
+        if hint is not None:
+            self.hint_label.setText(hint)
+
+
+# --------------------------------------------------------------------------- bar chart
+
+class BarChart(QWidget):
+    """Horizontal bar chart painted directly (label | bar | value)."""
+
+    ROW_H = 28
+
+    def __init__(self, empty_text: str = "No data", parent=None):
+        super().__init__(parent)
+        self.rows: List[Tuple[str, int, str]] = []
+        self.empty_text = empty_text
+        self.setMinimumHeight(self.ROW_H * 3)
+
+    def set_rows(self, rows: Sequence[Tuple[str, int, str]]):
+        """rows: (label, value, hex color)"""
+        self.rows = list(rows)
+        self.setMinimumHeight(max(self.ROW_H * 3, self.ROW_H * len(self.rows) + 4))
+        self.updateGeometry()
+        self.update()
+
+    def sizeHint(self) -> QSize:
+        return QSize(320, max(self.ROW_H * 3, self.ROW_H * len(self.rows) + 4))
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        font = QFont(self.font())
+        font.setPixelSize(12)
+        p.setFont(font)
+
+        if not self.rows:
+            p.setPen(QColor(Theme.TEXT_TERTIARY))
+            p.drawText(QRectF(self.rect()), Qt.AlignmentFlag.AlignCenter, self.empty_text)
+            p.end()
+            return
+
+        width = self.width()
+        label_w = min(int(width * 0.48), 260)
+        value_w = 36
+        bar_x = label_w + 10
+        bar_w = max(20, width - bar_x - value_w - 6)
+        peak = max(v for _, v, _ in self.rows) or 1
+        metrics = p.fontMetrics()
+
+        for i, (label, value, color) in enumerate(self.rows):
+            y = i * self.ROW_H + 2
+            p.setPen(QColor(Theme.TEXT_SECONDARY))
+            text = metrics.elidedText(label, Qt.TextElideMode.ElideMiddle, label_w)
+            p.drawText(QRectF(0, y, label_w, self.ROW_H - 4),
+                       Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(Theme.SURFACE_LIGHTER))
+            bar_rect = QRectF(bar_x, y + (self.ROW_H - 4) / 2 - 4, bar_w, 8)
+            p.drawRoundedRect(bar_rect, 4, 4)
+            p.setBrush(QBrush(QColor(color)))
+            p.drawRoundedRect(QRectF(bar_rect.x(), bar_rect.y(), max(8, bar_w * value / peak), 8), 4, 4)
+            p.setPen(QColor(Theme.TEXT_PRIMARY))
+            p.drawText(QRectF(width - value_w, y, value_w, self.ROW_H - 4),
+                       Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, str(value))
+        p.end()
+
+
+# --------------------------------------------------------------------------- findings
+
+class _FindingItem(QTreeWidgetItem):
+    """Tree item that sorts the severity column by severity, not alphabetically."""
+
+    def __lt__(self, other):
+        column = self.treeWidget().sortColumn() if self.treeWidget() else 0
+        if column == 0:
+            a = self.data(0, Qt.ItemDataRole.UserRole)
+            b = other.data(0, Qt.ItemDataRole.UserRole)
+            return (a.severity.value, a.title) < (b.severity.value, b.title)
+        return self.text(column).lower() < other.text(column).lower()
 
 
 class VulnerabilityList(QWidget):
-    """Modern vulnerability list with enhanced filtering."""
-    
+    """Filterable, sortable findings table."""
+
     vulnerability_selected = pyqtSignal(object)
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.vulnerabilities: List[Vulnerability] = []
-        self._setup_ui()
-    
-    def _setup_ui(self):
+        self._filtered: List[Vulnerability] = []
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(16)
-        
-        # Filter section with modern styling
-        filter_container = QFrame()
-        filter_container.setStyleSheet(f"""
-            QFrame {{
-                background-color: {Theme.SURFACE};
-                border: 1px solid {Theme.BORDER};
-                border-radius: {Theme.BORDER_RADIUS_NORMAL};
-                padding: 8px;
-            }}
-        """)
-        filter_layout = QHBoxLayout(filter_container)
-        filter_layout.setSpacing(8)
-        filter_layout.setContentsMargins(12, 8, 12, 8)
-        
-        # Filter label
-        filter_label = QLabel("Filter by severity:")
-        filter_label.setStyleSheet(f"color: {Theme.TEXT_TERTIARY}; font-size: {Theme.FONT_SIZE_SMALL};")
-        filter_layout.addWidget(filter_label)
-        
-        # Modern filter toggles
-        self.show_critical = self._create_filter_button("Critical", Theme.CRITICAL)
-        self.show_high = self._create_filter_button("High", Theme.HIGH)
-        self.show_medium = self._create_filter_button("Medium", Theme.MEDIUM)
-        self.show_low = self._create_filter_button("Low", Theme.LOW)
-        
-        filter_layout.addWidget(self.show_critical)
-        filter_layout.addWidget(self.show_high)
-        filter_layout.addWidget(self.show_medium)
-        filter_layout.addWidget(self.show_low)
-        filter_layout.addStretch()
-        
-        # Results count label
+        layout.setSpacing(10)
+
+        toolbar = QHBoxLayout()
+        toolbar.setSpacing(6)
+        self.show_critical = self._chip("Critical", Theme.CRITICAL)
+        self.show_high = self._chip("High", Theme.HIGH)
+        self.show_medium = self._chip("Medium", Theme.MEDIUM)
+        self.show_low = self._chip("Low", Theme.LOW)
+        for chip in (self.show_critical, self.show_high, self.show_medium, self.show_low):
+            toolbar.addWidget(chip)
+
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search findings, files, CWE...  (Ctrl+F)")
+        self.search_input.setClearButtonEnabled(True)
+        self.search_input.textChanged.connect(self._apply_filter)
+        toolbar.addWidget(self.search_input, 1)
+
         self.count_label = QLabel("0 issues found")
-        self.count_label.setStyleSheet(f"color: {Theme.TEXT_TERTIARY}; font-size: {Theme.FONT_SIZE_SMALL};")
-        filter_layout.addWidget(self.count_label)
-        
-        # List widget with modern styling
-        self.list_widget = QListWidget()
-        self.list_widget.setSpacing(10)
-        self.list_widget.setStyleSheet(f"""
-            QListWidget {{
-                background-color: {Theme.BACKGROUND};
-                border: none;
-                padding: 4px;
-            }}
-            QListWidget::item {{
-                background: transparent;
-                padding: 0px;
-                margin: 4px 0px;
-            }}
-        """)
-        
-        layout.addWidget(filter_container)
-        layout.addWidget(self.list_widget)
-    
-    def _create_filter_button(self, text: str, color: str) -> QPushButton:
-        """Create a modern filter toggle button."""
+        self.count_label.setObjectName("muted")
+        toolbar.addWidget(self.count_label)
+        layout.addLayout(toolbar)
+
+        self.tree = QTreeWidget()
+        self.tree.setColumnCount(4)
+        self.tree.setHeaderLabels(["SEVERITY", "FINDING", "LOCATION", "SCANNER"])
+        self.tree.setRootIsDecorated(False)
+        self.tree.setUniformRowHeights(True)
+        self.tree.setSortingEnabled(True)
+        self.tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+        self.tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.tree.setIconSize(QSize(10, 10))
+        header = self.tree.header()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.tree.setColumnWidth(0, 104)
+        self.tree.setColumnWidth(2, 190)
+        self.tree.currentItemChanged.connect(self._on_current_changed)
+        layout.addWidget(self.tree, 1)
+
+        # Older code/tests refer to the list widget by this name
+        self.list_widget = self.tree
+
+    def _chip(self, text: str, color: str) -> QPushButton:
         btn = QPushButton(text)
         btn.setCheckable(True)
         btn.setChecked(True)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: {color}20;
-                color: {color};
-                border: 1px solid {color}40;
-                border-radius: {Theme.BORDER_RADIUS_FULL};
-                padding: 6px 14px;
-                font-size: {Theme.FONT_SIZE_SMALL};
-                font-weight: 500;
+                background-color: transparent; color: {Theme.TEXT_TERTIARY};
+                border: 1px solid {Theme.BORDER}; border-radius: 13px;
+                padding: 4px 12px; font-size: 12px; font-weight: 600;
             }}
             QPushButton:checked {{
-                background-color: {color};
-                color: {Theme.BACKGROUND};
-                border-color: {color};
+                background-color: {Theme.rgba(color, 14)}; color: {color};
+                border: 1px solid {Theme.rgba(color, 45)};
             }}
-            QPushButton:hover:!checked {{
-                background-color: {color}30;
-                border-color: {color}60;
-            }}
+            QPushButton:hover {{ border-color: {color}; }}
         """)
-        btn.clicked.connect(self._apply_filter)
+        btn.toggled.connect(self._apply_filter)
         return btn
-    
+
     def set_vulnerabilities(self, vulnerabilities: List[Vulnerability]):
-        """Set list of vulnerabilities."""
-        self.vulnerabilities = vulnerabilities
+        self.vulnerabilities = list(vulnerabilities)
         self._apply_filter()
-    
+
     def _apply_filter(self):
-        """Apply filters and populate list."""
-        self.list_widget.clear()
-        
-        # Get filter states
-        show_severities = set()
-        if self.show_critical.isChecked():
-            show_severities.add(Severity.CRITICAL)
-        if self.show_high.isChecked():
-            show_severities.add(Severity.HIGH)
-        if self.show_medium.isChecked():
-            show_severities.add(Severity.MEDIUM)
-        if self.show_low.isChecked():
-            show_severities.add(Severity.LOW)
-        
-        # Filter and sort (critical first)
-        filtered = [v for v in self.vulnerabilities if v.severity in show_severities]
-        filtered.sort(key=lambda v: v.severity.value)
-        
-        # Update count
-        total = len(self.vulnerabilities)
-        showing = len(filtered)
-        self.count_label.setText(f"{showing} of {total} issues")
-        
-        # Add items
-        for vuln in filtered:
-            item = QListWidgetItem()
-            item.setSizeHint(QSize(0, 110))
-            
-            widget = VulnerabilityItem(vuln)
-            widget.clicked.connect(self._on_vulnerability_clicked)
-            
-            self.list_widget.addItem(item)
-            self.list_widget.setItemWidget(item, widget)
-    
-    def _on_vulnerability_clicked(self, vulnerability: Vulnerability):
-        """Handle vulnerability click."""
-        self.vulnerability_selected.emit(vulnerability)
-    
+        show = set()
+        for btn, sev in ((self.show_critical, Severity.CRITICAL), (self.show_high, Severity.HIGH),
+                         (self.show_medium, Severity.MEDIUM), (self.show_low, Severity.LOW)):
+            if btn.isChecked():
+                show.add(sev)
+        term = self.search_input.text().strip().lower()
+        self._filtered = [
+            v for v in self.vulnerabilities
+            if v.severity in show and (not term or term in (
+                f"{v.title} {location_for(v)} {v.description} {v.cwe_id or ''} {v.scanner_source}".lower()))
+        ]
+
+        self.tree.blockSignals(True)
+        self.tree.setSortingEnabled(False)
+        self.tree.clear()
+        for vuln in self._filtered:
+            item = _FindingItem([
+                vuln.severity.name.title(), vuln.title, location_for(vuln), vuln.scanner_source.replace('_', ' ')
+            ])
+            item.setIcon(0, severity_icon(vuln.severity.name))
+            item.setData(0, Qt.ItemDataRole.UserRole, vuln)
+            item.setForeground(0, QBrush(QColor(Theme.get_severity_color(vuln.severity.name))))
+            item.setForeground(2, QBrush(QColor(Theme.TEXT_SECONDARY)))
+            item.setForeground(3, QBrush(QColor(Theme.TEXT_TERTIARY)))
+            item.setToolTip(1, vuln.description)
+            item.setToolTip(2, location_for(vuln))
+            self.tree.addTopLevelItem(item)
+        self.tree.setSortingEnabled(True)
+        self.tree.blockSignals(False)
+
+        self.count_label.setText(f"{len(self._filtered)} of {len(self.vulnerabilities)} issues")
+
+    def _on_current_changed(self, current, _previous):
+        if current is not None:
+            self.vulnerability_selected.emit(current.data(0, Qt.ItemDataRole.UserRole))
+
+    def select_row(self, row: int):
+        item = self.tree.topLevelItem(row)
+        if item:
+            self.tree.setCurrentItem(item)
+            self.tree.scrollToItem(item)
+
+    def select_vulnerability(self, vulnerability: Vulnerability) -> bool:
+        for i in range(self.tree.topLevelItemCount()):
+            item = self.tree.topLevelItem(i)
+            if item.data(0, Qt.ItemDataRole.UserRole) is vulnerability:
+                self.tree.setCurrentItem(item)
+                self.tree.scrollToItem(item)
+                return True
+        return False
+
     def clear(self):
-        """Clear all vulnerabilities."""
         self.vulnerabilities = []
-        self.list_widget.clear()
+        self._filtered = []
+        self.tree.clear()
         self.count_label.setText("0 issues found")
 
 
-class CodePreview(QTextEdit):
-    """Modern code preview with enhanced styling."""
-    
+# --------------------------------------------------------------------------- details
+
+class DetailsView(QTextBrowser):
+    """Rich, read-only finding details. All scanned content is HTML-escaped."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setReadOnly(True)
-        self.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
-        self.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: {Theme.SURFACE_DARK};
-                color: {Theme.TEXT_PRIMARY};
-                font-family: {Theme.FONT_MONO};
-                font-size: {Theme.FONT_SIZE_SMALL};
-                border: 1px solid {Theme.BORDER};
-                border-radius: {Theme.BORDER_RADIUS_NORMAL};
-                padding: 16px;
-                line-height: 1.6;
-            }}
-        """)
-        
-        # Add shadow effect
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(12)
-        shadow.setColor(QColor(0, 0, 0, 50))
-        shadow.setOffset(0, 3)
-        self.setGraphicsEffect(shadow)
-    
-    def set_code(self, code: str, language: str = "python"):
-        """Set code content."""
-        self.setPlainText(code)
-    
-    def clear_code(self):
-        """Clear code content."""
-        self.clear()
+        self.setOpenExternalLinks(True)
+        self.document().setDocumentMargin(18)
+        self.show_placeholder()
 
+    def show_placeholder(self, text: str = "Select a finding to see details, the vulnerable code and how to fix it."):
+        self.setHtml(f'<p style="color:{Theme.TEXT_TERTIARY}; font-size:13px;">{html.escape(text)}</p>')
 
-class ModernProgressBar(QProgressBar):
-    """Modern animated progress bar."""
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setTextVisible(False)
-        self.setFixedHeight(6)
-        self.setStyleSheet(f"""
-            QProgressBar {{
-                background-color: {Theme.SURFACE};
-                border: none;
-                border-radius: {Theme.BORDER_RADIUS_FULL};
-            }}
-            QProgressBar::chunk {{
-                background-color: {Theme.PRIMARY};
-                border-radius: {Theme.BORDER_RADIUS_FULL};
-            }}
-        """)
-        
-        # Animation timer for indeterminate state
-        self._anim_offset = 0
-        self._anim_timer = QTimer(self)
-        self._anim_timer.timeout.connect(self._update_animation)
-    
-    def _update_animation(self):
-        """Update animation frame."""
-        self._anim_offset = (self._anim_offset + 2) % 100
-        gradient = f"""
-            QProgressBar::chunk {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {Theme.SURFACE},
-                    stop:{self._anim_offset/100} {Theme.PRIMARY},
-                    stop:{(self._anim_offset+30)/100} {Theme.PRIMARY_HOVER},
-                    stop:{(self._anim_offset+60)/100} {Theme.PRIMARY},
-                    stop:1 {Theme.SURFACE});
-                border-radius: {Theme.BORDER_RADIUS_FULL};
-            }}
-        """
-        self.setStyleSheet(f"""
-            QProgressBar {{
-                background-color: {Theme.SURFACE};
-                border: none;
-                border-radius: {Theme.BORDER_RADIUS_FULL};
-            }}
-            {gradient}
-        """)
-    
-    def start_animation(self):
-        """Start indeterminate animation."""
-        self.setRange(0, 0)
-        self._anim_timer.start(50)
-    
-    def stop_animation(self):
-        """Stop animation."""
-        self._anim_timer.stop()
-        self.setStyleSheet(f"""
-            QProgressBar {{
-                background-color: {Theme.SURFACE};
-                border: none;
-                border-radius: {Theme.BORDER_RADIUS_FULL};
-            }}
-            QProgressBar::chunk {{
-                background-color: {Theme.PRIMARY};
-                border-radius: {Theme.BORDER_RADIUS_FULL};
-            }}
+    def show_vulnerability(self, v: Vulnerability):
+        e = html.escape
+        color = Theme.get_severity_color(v.severity.name)
+        pill = (f'<span style="background-color:{color}; color:{Theme.BACKGROUND}; font-weight:700;'
+                f' font-size:11px;">&nbsp;{v.severity.name}&nbsp;</span>')
+        meta = [e(location_for(v)), e(v.scanner_source.replace('_', ' ')), e(owasp_label(v))]
+        if v.cwe_id:
+            num = e(v.cwe_id.split('-')[-1])
+            meta.append(f'<a style="color:{Theme.PRIMARY};" href="https://cwe.mitre.org/data/definitions/{num}.html">'
+                        f'{e(v.cwe_id)}</a>')
+
+        code_html = ''
+        if v.code_snippet:
+            rows = []
+            for line in v.code_snippet.splitlines():
+                flagged = line.startswith('>>>')
+                bg = Theme.rgba(color, 16) if flagged else 'transparent'
+                fg = Theme.TEXT_PRIMARY if flagged else Theme.TEXT_SECONDARY
+                rows.append(f'<tr><td style="background-color:{bg}; color:{fg}; padding:1px 8px;">'
+                            f'<pre style="margin:0; font-family:Consolas, monospace; font-size:12px;">'
+                            f'{e(line)}</pre></td></tr>')
+            label = 'VULNERABLE CODE' if v.file_path else 'EVIDENCE'
+            code_html = (f'<p style="color:{Theme.TEXT_TERTIARY}; font-size:11px; font-weight:700;">{label}</p>'
+                         f'<table width="100%" cellspacing="0" style="background-color:{Theme.SURFACE_DARK};">'
+                         + ''.join(rows) + '</table>')
+
+        extra = ''
+        if v.metadata.get('fixed_version'):
+            extra += f'<p><b>Fixed in:</b> {e(str(v.metadata["fixed_version"]))}</p>'
+        if v.metadata.get('advisories'):
+            extra += f'<p><b>Advisories:</b> {e(", ".join(v.metadata["advisories"][:15]))}</p>'
+
+        self.setHtml(f"""
+            <div style="font-size:13px; color:{Theme.TEXT_PRIMARY};">
+            <p>{pill}</p>
+            <p style="font-size:17px; font-weight:700; margin-top:6px;">{e(v.title)}</p>
+            <p style="color:{Theme.TEXT_TERTIARY}; font-size:12px;">{' &nbsp;&middot;&nbsp; '.join(meta)}</p>
+            <p style="color:{Theme.TEXT_TERTIARY}; font-size:11px; font-weight:700; margin-top:14px;">WHY IT MATTERS</p>
+            <p style="color:{Theme.TEXT_SECONDARY};">{e(v.description)}</p>
+            <p style="color:{Theme.TEXT_TERTIARY}; font-size:11px; font-weight:700; margin-top:14px;">HOW TO FIX</p>
+            <p style="color:{Theme.SUCCESS};">{e(v.remediation)}</p>
+            {extra}
+            {code_html}
+            </div>
         """)
 
 
-class ProgressWidget(QWidget):
-    """Modern progress indicator with status and file info."""
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._setup_ui()
-        self.hide()
-    
-    def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(16)
-        
-        # Modern progress bar
-        self.progress_bar = ModernProgressBar()
-        self.progress_bar.setFixedWidth(400)
-        
-        # Status with icon-style prefix
-        self.status_label = QLabel("Ready")
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setStyleSheet(f"""
-            color: {Theme.TEXT_SECONDARY};
-            font-size: {Theme.FONT_SIZE_NORMAL};
-            font-weight: 500;
-        """)
-        
-        # Current file being scanned
-        self.file_label = QLabel("")
-        self.file_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.file_label.setStyleSheet(f"""
-            color: {Theme.TEXT_TERTIARY};
-            font-size: {Theme.FONT_SIZE_SMALL};
-            font-family: {Theme.FONT_MONO};
-        """)
-        self.file_label.hide()
-        
-        layout.addWidget(self.progress_bar)
-        layout.addWidget(self.status_label)
-        layout.addWidget(self.file_label)
-        
-        self.setStyleSheet(f"""
-            ProgressWidget {{
-                background-color: {Theme.BACKGROUND};
-            }}
-        """)
-    
-    def set_status(self, text: str, filename: str = None):
-        """Update status text and optional filename."""
-        self.status_label.setText(text)
-        if filename:
-            self.file_label.setText(f"  {filename}")
-            self.file_label.show()
-        else:
-            self.file_label.hide()
-    
-    def show_progress(self):
-        """Show progress widget."""
-        self.show()
-        self.progress_bar.start_animation()
-    
-    def hide_progress(self):
-        """Hide progress widget."""
-        self.hide()
-        self.progress_bar.stop_animation()
+# --------------------------------------------------------------------------- tables
+
+def make_table(headers: Sequence[str]) -> QTableWidget:
+    table = QTableWidget(0, len(headers))
+    table.setHorizontalHeaderLabels([h.upper() for h in headers])
+    table.verticalHeader().setVisible(False)
+    table.setShowGrid(False)
+    table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+    table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+    table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+    table.setSortingEnabled(True)
+    table.setWordWrap(False)
+    table.horizontalHeader().setHighlightSections(False)
+    table.horizontalHeader().setStretchLastSection(True)
+    table.verticalHeader().setDefaultSectionSize(32)
+    return table
 
 
-class ActionButton(QPushButton):
-    """Styled action button."""
-    
-    def __init__(self, text: str, primary: bool = False, parent=None):
-        super().__init__(text, parent)
-        self.primary = primary
-        self._apply_style()
-    
-    def _apply_style(self):
-        if self.primary:
-            self.setObjectName("primaryButton")
-        else:
-            self.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {Theme.SURFACE};
-                    color: {Theme.TEXT_PRIMARY};
-                    border: 1px solid {Theme.BORDER};
-                    border-radius: {Theme.BORDER_RADIUS_NORMAL};
-                    padding: 8px 16px;
-                }}
-                QPushButton:hover {{
-                    background-color: {Theme.SURFACE_LIGHT};
-                    border-color: {Theme.BORDER_LIGHT};
-                }}
-            """)
+def fill_table(table: QTableWidget, rows: Sequence[Tuple[Severity, Sequence[str], object]]):
+    """rows: (severity, cell texts after the severity column, payload stored on the row)."""
+    table.setSortingEnabled(False)
+    table.setRowCount(0)
+    for severity, cells, payload in rows:
+        r = table.rowCount()
+        table.insertRow(r)
+        sev_item = QTableWidgetItem(severity.name.title())
+        sev_item.setIcon(severity_icon(severity.name))
+        sev_item.setForeground(QBrush(QColor(Theme.get_severity_color(severity.name))))
+        sev_item.setData(Qt.ItemDataRole.UserRole, payload)
+        table.setItem(r, 0, sev_item)
+        for c, text in enumerate(cells, start=1):
+            item = QTableWidgetItem(str(text))
+            item.setToolTip(str(text))
+            table.setItem(r, c, item)
+    table.resizeColumnsToContents()
+    for c in range(table.columnCount() - 1):
+        table.setColumnWidth(c, min(table.columnWidth(c) + 16, 320))
+    table.setSortingEnabled(False)  # keep critical-first order from the engine
