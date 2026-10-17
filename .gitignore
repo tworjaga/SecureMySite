@@ -37,7 +37,8 @@ MANIFEST
 # PyInstaller
 *.manifest
 *.spec
-!build.spec  # Keep the PyInstaller spec file in version control
+# Keep the PyInstaller spec file in version control
+!build.spec
 
 # Installer logs
 pip-log.txt
@@ -200,6 +201,8 @@ $RECYCLE.BIN/
 /samples/output/
 
 # Generated reports (user data)
+.securemysite-baseline.json
+*.sarif
 *.security-report.json
 *.security-report.html
 /security-reports/
@@ -267,8 +270,6 @@ node_modules/
 # Local development scripts
 dev_*.py
 scratch_*.py
-test_*.py
-!test_*.py  # Uncomment if you want to exclude all test files
 
 # Profiling data
 *.prof
