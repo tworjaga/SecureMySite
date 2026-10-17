@@ -1,5 +1,6 @@
 """Input validation functions."""
 
+import ipaddress
 import re
 from pathlib import Path
 from typing import Optional, Tuple
@@ -44,6 +45,60 @@ def validate_project_path(path: str) -> Tuple[bool, Optional[str]]:
         return False, f"Invalid path: {e}"
 
 
+def is_local_hostname(hostname: Optional[str]) -> bool:
+    """True for loopback addresses, 'localhost', *.localhost and mDNS *.local names."""
+    if not hostname:
+        return False
+    hostname = hostname.strip('[]').rstrip('.').lower()
+    if hostname == 'localhost' or hostname.endswith('.localhost') or hostname.endswith('.local'):
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
+
+
+_LABEL_RE = re.compile(r'^(?!-)[a-z0-9-]{1,63}(?<!-)$')
+
+
+def normalize_domain(text: str) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Turn user input ("https://Example.com/path", "www.example.com.") into a hostname.
+
+    Returns:
+        (hostname, None) on success, (None, error message) otherwise
+    """
+    raw = (text or '').strip()
+    if not raw:
+        return None, "Enter a domain, e.g. example.com"
+    if '://' not in raw:
+        raw = 'https://' + raw
+    try:
+        host = urlparse(raw).hostname
+    except ValueError as e:
+        return None, f"Invalid domain: {e}"
+    if not host:
+        return None, "Enter a domain, e.g. example.com"
+    host = host.rstrip('.').lower()
+    try:
+        ipaddress.ip_address(host)
+        return None, "Enter a domain name rather than an IP address"
+    except ValueError:
+        pass
+    if is_local_hostname(host):
+        return None, "Local hosts are scanned with the local URL option, not the domain scan"
+    try:
+        host = host.encode('idna').decode('ascii')
+    except UnicodeError:
+        return None, f"Invalid internationalized domain: {host}"
+    labels = host.split('.')
+    if len(labels) < 2 or len(host) > 253 or not all(_LABEL_RE.match(label) for label in labels):
+        return None, f"Not a valid domain name: {host}"
+    if labels[-1].isdigit():
+        return None, f"Not a valid domain name: {host}"
+    return host, None
+
+
 def validate_url(url: str, allow_localhost_only: bool = True) -> Tuple[bool, Optional[str]]:
     """
     Validate URL format and optionally restrict to localhost.
@@ -73,19 +128,11 @@ def validate_url(url: str, allow_localhost_only: bool = True) -> Tuple[bool, Opt
         if not parsed.hostname:
             return False, "URL missing hostname"
         
-        if allow_localhost_only:
-            # Only allow localhost variants
-            allowed_hosts = [
-                'localhost',
-                '127.0.0.1',
-                '::1',
-            ]
-            
-            hostname = parsed.hostname
-            
-            if hostname not in allowed_hosts and not hostname.startswith('127.'):
-                if not hostname.endswith('.local'):
-                    return False, f"Only localhost, 127.0.0.1, and *.local allowed. Got: {hostname}"
+        if allow_localhost_only and not is_local_hostname(parsed.hostname):
+            return False, f"Only localhost, 127.0.0.0/8, ::1 and *.localhost / *.local allowed. Got: {parsed.hostname}"
+
+        # Accessing .port raises ValueError for out-of-range ports
+        _ = parsed.port
         
         return True, None
         
