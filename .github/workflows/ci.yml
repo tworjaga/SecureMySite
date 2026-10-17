@@ -43,10 +43,12 @@ jobs:
       - name: Lint (undefined names / syntax errors)
         shell: bash
         run: |
-          python -m pyflakes app.py main.py core models scanners scoring utils gui prompt_engine tests \
-            | grep -vE "imported but unused|assigned to but never used|f-string is missing placeholders" \
-            | tee lint.txt
-          test ! -s lint.txt
+          # pyflakes exits 1 on any message (even unused imports) and grep exits 1 when it
+          # filters everything out, so neither exit code is used - only the filtered output.
+          python -m pyflakes app.py main.py core models scanners scoring utils gui prompt_engine tests > pyflakes.txt || true
+          grep -vE "imported but unused|assigned to but never used|f-string is missing placeholders" pyflakes.txt > lint.txt || true
+          if [ -s lint.txt ]; then cat lint.txt; exit 1; fi
+          echo "No undefined names or syntax errors"
 
       - name: Run tests
         run: python -m pytest -q
