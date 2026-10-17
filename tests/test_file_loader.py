@@ -1,124 +1,72 @@
-"""Engine features (suppression, baseline, filtering), scoring and report formats."""
+"""File discovery and exclusion rules."""
 
-import csv
-import io
-import json
-
-from core.engine import AnalysisEngine
-from core import reporter
-from models.vulnerability import Vulnerability, Severity, Category
-from scoring.score_engine import ScoreEngine
-from utils.validators import validate_url
+from core.config import Config
+from core.file_loader import FileLoader
 
 
-def test_inline_suppression(make_project):
-    project = make_project({"app.py": '''
-        eval(a)  # securemysite: ignore
-        # securemysite: ignore-next-line
-        eval(b)
-        eval(c)  # nosec
-        eval(d)
-    '''})
-    result = AnalysisEngine(project).analyze()
-    assert [v.line_number for v in result.vulnerabilities] == [5]
-    assert result.metadata["suppressed"] == 3
+def loaded(project):
+    return sorted(p.relative_to(project).as_posix() for p, _ in FileLoader(project).load_files())
 
 
-def test_min_severity_filter(sample_project):
-    result = AnalysisEngine(sample_project, scanner_config={"min_severity": "critical"}).analyze()
-    assert result.vulnerabilities
-    assert all(v.severity == Severity.CRITICAL for v in result.vulnerabilities)
-    assert result.metadata["filtered_by_severity"] > 0
+def test_substring_names_are_not_excluded(make_project):
+    project = make_project({
+        "layout.py": "x = 1",
+        "checkout.js": "let a = 1",
+        "website/app.py": "x = 1",
+        "src/environment.py": "x = 1",
+        "about.txt": "hello",
+    })
+    assert loaded(project) == ["about.txt", "checkout.js", "layout.py", "src/environment.py", "website/app.py"]
 
 
-def test_baseline_hides_known_findings(make_project, tmp_path):
-    project = make_project({"app.py": "eval(a)\n"})
-    engine = AnalysisEngine(project)
-    engine.analyze()
-    baseline = tmp_path / "baseline.json"
-    baseline.write_text(engine.export_results("json"), encoding="utf-8")
-
-    # Insert lines above: fingerprints are line-number independent
-    (project / "app.py").write_text("import os\n\neval(a)\nexec(b)\n", encoding="utf-8")
-    result = AnalysisEngine(project, scanner_config={"baseline": str(baseline)}).analyze()
-    assert [v.line_number for v in result.vulnerabilities] == [4]
-    assert result.metadata["baseline_hidden"] == 1
+def test_dependency_and_build_dirs_excluded(make_project):
+    project = make_project({
+        "node_modules/lib/index.js": "eval(x)",
+        "dist/bundle.js": "eval(x)",
+        "__pycache__/x.py": "",
+        "src/main.py": "x = 1",
+    })
+    assert loaded(project) == ["src/main.py"]
 
 
-def test_scanner_selection(sample_project):
-    result = AnalysisEngine(sample_project, scanner_config={"enabled_scanners": ["javascript_scanner"]}).analyze()
-    assert {v.scanner_source for v in result.vulnerabilities} == {"javascript_scanner"}
+def test_env_files_and_dockerfile_are_scanned(make_project):
+    project = make_project({
+        ".env": "SECRET=1",
+        ".env.production": "SECRET=1",
+        "Dockerfile": "FROM python",
+        "image.png": "not really",
+    })
+    assert loaded(project) == [".env", ".env.production", "Dockerfile"]
 
 
-def test_cancel_stops_scan(sample_project):
-    engine = AnalysisEngine(sample_project)
-    engine.analyze(progress=lambda *a: engine.cancel())
-    assert engine.scan_result.metadata["cancelled"]
+def test_virtualenv_detected_by_pyvenv_cfg(make_project):
+    project = make_project({
+        "myenv/pyvenv.cfg": "home = x",
+        "myenv/lib/site.py": "eval(x)",
+        "app.py": "x = 1",
+    })
+    assert loaded(project) == ["app.py"]
 
 
-# ----------------------------------------------------------------- scoring
-
-_counter = iter(range(10**6))
-
-
-def _vuln(severity):
-    return Vulnerability(title=f"finding-{next(_counter)}", description="d", severity=severity,
-                         category=Category.INJECTION, remediation="r", scanner_source="s")
-
-
-def test_score_caps_keep_progress_visible():
-    engine = ScoreEngine()
-    many_low = [_vuln(Severity.LOW) for _ in range(50)]
-    assert engine.calculate(many_low).score == 90
-    one_critical = engine.calculate([_vuln(Severity.CRITICAL)])
-    assert one_critical.score <= 49
-    assert engine.calculate([]).score == 100
+def test_securemysiteignore(make_project):
+    project = make_project({
+        ".securemysiteignore": "# comment\nlegacy/\n*.min.js\n",
+        "legacy/old.py": "eval(x)",
+        "static/lib.min.js": "eval(x)",
+        "static/app.js": "x",
+    })
+    assert loaded(project) == ["static/app.js"]
 
 
-# ----------------------------------------------------------------- reports
-
-def _xss_result(make_project):
-    project = make_project({"x.js": "el.innerHTML = '<img src=x onerror=alert(1)>' + location.hash;\n"})
-    return AnalysisEngine(project).analyze()
-
-
-def test_html_report_escapes_content(make_project):
-    html = reporter.to_html(_xss_result(make_project))
-    assert "<img src=x onerror" not in html
-    assert "&lt;img src=x onerror" in html
+def test_extra_excludes(make_project):
+    project = make_project({"migrations/0001.py": "x", "app.py": "x"})
+    files = [p.name for p, _ in FileLoader(project, extra_excludes=["migrations/*"]).load_files()]
+    assert files == ["app.py"]
 
 
-def test_sarif_structure(sample_project):
-    result = AnalysisEngine(sample_project).analyze()
-    sarif = json.loads(reporter.to_sarif(result))
-    run = sarif["runs"][0]
-    assert sarif["version"] == "2.1.0"
-    assert len(run["results"]) == len(result.vulnerabilities)
-    rule_ids = {r["id"] for r in run["tool"]["driver"]["rules"]}
-    for res in run["results"]:
-        assert res["ruleId"] in rule_ids
-        loc = res["locations"][0]["physicalLocation"]
-        assert not loc["artifactLocation"]["uri"].startswith(("C:", "/"))
-
-
-def test_csv_and_markdown(sample_project):
-    result = AnalysisEngine(sample_project).analyze()
-    rows = list(csv.DictReader(io.StringIO(reporter.to_csv(result))))
-    assert len(rows) == len(result.vulnerabilities)
-    assert rows[0]["severity"] == "CRITICAL"
-    md = reporter.to_markdown(result)
-    assert md.startswith("# Security Analysis Report")
-    json.loads(reporter.to_json(result))
-
-
-# ----------------------------------------------------------------- validators
-
-def test_localhost_validation_blocks_lookalikes():
-    assert validate_url("http://localhost:3000")[0]
-    assert validate_url("http://127.0.0.5")[0]
-    assert validate_url("http://[::1]:8080")[0]
-    assert validate_url("http://app.localhost")[0]
-    assert not validate_url("http://127.evil.com")[0]
-    assert not validate_url("http://localhost.evil.com")[0]
-    assert not validate_url("http://example.com")[0]
-    assert not validate_url("file:///etc/passwd")[0]
+def test_config_language_resolution():
+    assert Config.get_language(".env.local") == "env"
+    assert Config.get_language("Dockerfile") == "dockerfile"
+    assert Config.get_language("index.html") == "html"
+    assert Config.get_language("page.jinja2") == "html"
+    assert Config.get_language("photo.png") is None
