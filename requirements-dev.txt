@@ -1,0 +1,5 @@
+# Development / CI dependencies
+-r requirements.txt
+pytest>=7.0.0
+pytest-qt>=4.0.0
+pyflakes>=3.0.0
